@@ -2,6 +2,6 @@
 
 This is a [[https://github.com/ejmg/an-idiots-guide-to-installing-arch-on-a-lenovo-carbon-x1-gen-6][sequel of sorts]] because I don't learn from my mistakes.
 
-[[file:.img/dual-monitor-Just-Works.jpg][Photo of my P1 plugged into a monitor]]
+[[file:img/dual-monitor-Just-Works.jpg][Photo of my P1 plugged into a monitor]]
 
 The guide is found in [[./arch-install.org][arch-install.org]]
