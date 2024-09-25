@@ -149,10 +149,10 @@ For me:
   + this is =nvme1n1= on my system
 *** copy bitlocker backup codes
 So my drives came encrypted with Bitlocker by
-default... but... because I didn't pay for Windows 11 Pro... I don't
+default... but... because I didn't pay for Windows 11 Pro... I only
 have a nerfed version of bitlocker. I can't manage my encrypted drives
 willy-nilly. Without upgrading to Windows 11 Pro, this has
-implications.
+implications in terms of managing encrypted drives.
 
 Go to settings for encryption and click on the option for Bitlocker
 backup codes. It should take you to a microsoft website that gives you
@@ -168,7 +168,19 @@ We need to disable Bitlocker on the second drive. If you don't have Windows 11 P
 - nvme1n1 is the "free" SSD, i.e. doesn't have windows installed on this drive
 - windows has this labeled as =D:=
 - ojala we shall liberate it
-*** TODO disable secure boot in windows settings
+
+
+Since I have Windows 11 *Home*, I don't have the full suite of
+bitlocker tools that makes this a one or two click solution. Instead,
+I had to dig around [[https://answers.microsoft.com/en-us/windows/forum/all/turning-off-bitlocker-encryption-on-windows-11/e6403c0a-1f8a-46a4-af0a-d96a9dcced7a][for this]]. Make sure you use the proper elevated
+command console, not the newer version that is used by default on
+windows 11.
+
+If you have Windows 11 *Home* like I do, know that this is not
+reversible. You don't get to re-encrypt a drive without a Windows 11 Pro
+license.
+
+*** disable secure boot in windows settings
 *NOTE* Remember when I said you need to have access to your bitlocker
 backup codes? I meant it! After we disable secure boot, the drive that
 still has Windows may get upset and ask for them the next time you try
