@@ -19,6 +19,7 @@ The features of this install include:
 
 *furthermore, use this guide at your own risk.*
 
+** TODO references/resources
 ** summary/review
 
 my system works. it works fast. it work good. it work nice. it just
@@ -86,21 +87,51 @@ TODO: attach the photos I took. Why not.
 
 ** Windows & UEFI/bios
 *** find EFI partition for windows
+Go to disk management and confirm the partition setup.
+
+For me:
 - =Disk 0, Partition 1=, this will be =nvme0n1p1=
   + =260mb= size
 - you can also note the =2gb= recovery partition at the *end* of the drive
 *** copy bitlocker backup codes
-*** disable bitlocker on the second SSD
-**** windows command prompt & manage-bde
+So my drives came encrypted with Bitlocker by
+default... but... because I didn't pay for Windows 11 Pro... I don't
+have a nerfed version of bitlocker. I can't manage my encrypted drives
+willy-nilly. Without upgrading to Windows 11 Pro, this has
+implications.
+
+Go to settings for encryption and click on the option for Bitlocker
+backup codes. It should take you to a microsoft website that gives you
+a code for each encrypted drive. Remember this URL & how to login into
+the same account. You should also probably save a backup somewhere.
+*** TODO disable bitlocker on the second SSD
+Go back and document this correctly lol.
+
+We need to disable Bitlocker on the second drive. If you don't have Windows 11 Pro like myself, that means:
+1. Once you disable bitlocker, you can't reenable it on the drive. This really shouldn't be an issue.
+2. We have to use a bespoke Windows Command to get this to work
+**** windows command prompt & =manage-bde=
 - nvme1n1 is the "free" SSD, i.e. doesn't have windows installed on this drive
 - windows has this labeled as =D:=
 - ojala we shall liberate it
-*** disable secure boot in windows settings....
-*** restart & disable secure boot
-*** restart windows & check if bitlocker is mad
-** setup liveusb & install environment
-*** setup a live usb
+*** TODO disable secure boot in windows settings
+*NOTE* Remember when I said you need to have access to your bitlocker
+backup codes? I meant it! After we disable secure boot, the drive that
+still has Windows may get upset and ask for them the next time you try
+to boot into it.
 
+*** restart & disable secure boot
+
+Restart the laptop. Press F1 as it boots up and you should be able to
+get into the UEFI menu. Go under startup settings and there should be
+an option for secure boot. You need to disable it for now.
+
+*** restart windows & check if bitlocker is mad
+
+This is just a sanity check. Make sure you can get back into your machine, basically. Your backup code should Just Work.
+** setup liveusb & install environment
+alright, with the windows stuff aside, let's move on to arch.
+*** setup a live usb
 I'm not going to help you here beyond giving the recommendation for
 what I did this time. Fedora has a live usb writer that Just Works. I
 don't know why I used this tool or even why/how I found it. I've
@@ -609,8 +640,8 @@ you shouldn't be installing these lol.
   pacman -S linux-headers linux-lts linux-lts-headers os-prober dkms intel-ucode nvidia-open-dkms \
 	 nvidia-utils nvidia-settings opencl-nvidia efivar edk2-shell efibootmgr sudo git pigz lbzip2 \
 	 networkmanager iwd plymouth openssh zsh zsh-completions dosfstools gptfdisk btrfs-progs \
-	 terminus-font ttf-dejavu ttf-liberation noto-fonts ttf-fira-code cantarell-fonts libfido2 \
-	 firefox chromium
+	 terminus-font ttf-dejavu ttf-liberation noto-fonts ttf-fira-code cantarell-fonts  adobe-source-sans-fonts \
+	 adobe-source-han-sans-otc-fonts adobe-source-han-serif-otc-fonts noto-fonts noto-fonts-emoji libfido2 firefox chromium
 #+end_src
 
 *** create user
@@ -973,7 +1004,7 @@ will want from the get-go. I will definitely be installing more as I
 go along and realize I am missing something lol.
 
 #+begin_src sh
-  sudo pacman -S plasma konsole dolphin ark kwrite spectacle krunner partitionmanager gwenview okular
+  sudo pacman -S plasma konsole dolphin ark kwrite spectacle krunner partitionmanager gwenview okular kcharselect
 #+end_src
 
 you're going to be given a lot of options. i went with defaults (don't
