@@ -1,0 +1,1538 @@
+* arch install dot text
+
+these are my notes, thus far, for installing arch linux, from scratch,
+on a Lenovo P1 Gen 7 w/ an Intel Ultra 9 185H, NVIDIA RTX 4070 Max-Q,
+and 64Gb RAM.
+
+The features of this install include:
+- Dual Boot with windows and arch on separate SSDs
+  - systemd-boot + edk2-shell for booting into Windows
+- unencrypted =/boot= with the primary Arch partition encrypted with LUKS
+- BTRFS for volume management + swapfile for proper system hibernation
+- ZRAM based swap
+
+
+[[file:.img/neofetch-desktop.png][my desktop with kitty and neofetch]]
+
+
+*consider this guide WIP.*
+
+*furthermore, use this guide at your own risk.*
+
+** summary/review
+
+my system works. it works fast. it work good. it work nice. it just
+work. that was my experience the last time I installed arch and wrote
+up notes on it for my old lenovo X1 (it still works and runs arch just
+fine, btw).
+
+i went into this not expecting the same experience because of
+NVIDIA. this proved to be the case but, more than anything else, a lot
+of things had changed since i last made a full system install from
+scratch. furthermore, this time round, I am using tools like
+systemd-boot, edk2-shell, and BTRFS. [[https://youtu.be/UW12BT9pYEw?feature=shared][the game done changed]].
+
+** preface note on installing with SSD upgrade
+I bought a customized model.
+- 2x1Tb SSDs
+- 64Gb RAM
+- NVIDIA RTX 4070 Max-Q
+- Intel Ultra 9 185H
+
+
+However, I upgraded the SSD slot that is ultimately used for Arch
+Linux on this machine.
+
+You read that correctly: I preserved my window install (more on that
+below) by simply keeping the OSs on seperate drives. This works really
+well for me because it means that the EFI partitions are cleanly
+seperated and that, absent re-install shenanigans, Windows should
+never mangle my linux drive and vice-versa.
+
+*Even if you are not doing that*, the following is good information to
+know as it impacts how I documented my own install.
+
+*** drive labels
+
+Before changing my drives, the "primary" SSD (where Windows is
+installed) was reported as =nvme0n1=. I wrote this guide while testing
+my install on the original "secondary" SSD. At the time, it was
+labeled =nvme1n1=.
+
+After nailing out a ~fully functional and fleshed out base install of
+Arch, I swapped the drives. When I first booted the system, *the
+labels of my drives swapped*. However, when I rebooted the system
+again... they were back to their original names. They haven't changed
+since.
+
+The only reason I mention this is as a warning to pay attention to
+your drives. Don't blindly copy the labels I use in this guide. I
+don't want you to accidentally nuke your windows partition, or
+anything else, because you presumed that these labels are identical
+across machines and installs.
+
+*** mapping drives to physical drive slots 
+
+The only other note I have is which physical drive slot is which. That
+is to say—when the laptop is flipped over and opened up—of the two
+physical SSD slots, the leftside slot is the drive that contains the
+base windows install. The second slot, the one I am upgrading and
+installed Arch Linux, is the slot on the righthand side of the
+laptop. The process was extremely easy given the new design of lenovo
+laptops but here's a personal note that might help others who are
+doing the same scheme as me.
+
+TODO: attach the photos I took. Why not. 
+
+** Windows & UEFI/bios
+*** find EFI partition for windows
+- =Disk 0, Partition 1=, this will be =nvme0n1p1=
+  + =260mb= size
+- you can also note the =2gb= recovery partition at the *end* of the drive
+*** copy bitlocker backup codes
+*** disable bitlocker on the second SSD
+**** windows command prompt & manage-bde
+- nvme1n1 is the "free" SSD, i.e. doesn't have windows installed on this drive
+- windows has this labeled as =D:=
+- ojala we shall liberate it
+*** disable secure boot in windows settings....
+*** restart & disable secure boot
+*** restart windows & check if bitlocker is mad
+** setup liveusb & install environment
+*** setup a live usb
+
+I'm not going to help you here beyond giving the recommendation for
+what I did this time. Fedora has a live usb writer that Just Works. I
+don't know why I used this tool or even why/how I found it. I've
+previously formatted drives with nothing but =dd= but the GUI provided
+by Fedora was literally flawless for me across 3 brands of flashdrives
+and across 4 different linux ISOs. This includes dealing with how
+macOS specifically responds to a liveUSB. If you want to use =dd=, you
+can look at my old guide but I don't advise that. There's better
+resources out there.
+
+Here's a link to the [[https://fedoraproject.org/workstation/download][fedora media writer]]. They have a media writer for
+Windows, macOS, and Linux. I did this with macOS so if it doesn't work
+for you on e.g. Windows, I'm sorry.
+
+You're going to want to grab an arch linux ISO, too, of course. You
+can grab any that are listed on the [[https://archlinux.org/download/][arch linux website]]. If you're not
+going to torrent one, just pick a mirror.
+
+It never hurts to check the blake2b checksums + pgp signatures. the
+arch linux download page includes instructions for this. It's not hard
+and it's a good learning experience if, for some god forsaken reason,
+you've never done either of these things while reading this specific
+arch linux install guide. Godspeed. For what it is worth, I did, in
+fact, do this myself for my own install.
+
+*** boot the arch iso
+
+plug in your liveUSB into the p1. turn on the p1. go to the bios setup
+again like in our previous steps.  this time, however, go to
+startup(?) option. click on boot. drag the option for your USB to the
+top. I used a Samsung FIT USB and the options list basically had that
+as the literal selection. I suspect that it will show your USB by
+brand, as well.
+
+save settings and start. you should be presented with a black screen
+that gives you the options to choose the arch linux live
+installer. press enter and proceed.
+
+you should see a boot window for arch linux. congrats. you have just started.
+
+*** config network
+
+we want internet and =iwctl= is our tool. you can use something
+simpler (as I did previously) but this is painless. choose painless
+when possible, there's enough pain in this process as it stands.
+
+#+begin_src sh
+  iwctl
+  [iwd]# station list # should give us a list of our connections and show wlan0 and that it is disconnected
+  [iwd]# station wlan0 get-networks
+  [iwd]# station wlan0 connect ${YOUR_NETWORK_HERE}
+  [iwd]# station list # should now show us connected if done correct
+  [iwd]# quit
+#+end_src
+
+you should test that your connection works with e.g. =ping google.com=. if packets are successfully shooting without drop, you are good to go.
+
+*** ssh into liveusb
+
+This is optional but I'm going to do it as it makes copying & pasting
+commands easier and less error prone.
+#+begin_src sh
+  passwd
+#+end_src
+
+Simply provide a password.
+
+Then, find your IP:
+#+begin_src sh
+  ip addr show # I am only giving partial results below. What matters is the wlan0 section:
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+<SNIP>  
+3: wlan0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
+    link/ether e8:bf:b8:3e:30:be brd ff:ff:ff:ff:ff:ff
+    inet 192.168.1.213/24 metric 600 brd 192.168.1.255 scope global dynamic wlan0 # THIS IS THE LINE.
+<SNIP>
+#+end_src
+
+Take that IP address and ssh on your machine of choice. Previously, I've done this all locally on the machine I was formatting but, since I'm writing this document as I go alone, it really helps to just SSH in myself.
+i.e.
+#+begin_src sh
+  ssh root@192.168.1.213
+#+end_src
+
+*** Keymapping
+
+#+begin_src sh
+  loadkeys us # run loadkeys list to find other keymappings if that is what you need
+#+end_src
+
+*** HiDPI console font
+
+#+begin_src sh
+  ls /usr/share/kbd/consolefonts # all fonts on liveusb
+  setfont ter-132n # terminus normal font. only relevant if actually using machine, not ssh'ing etc. will set later again.
+#+end_src
+
+*** timedate
+#+begin_src sh
+  timedatectl set-timezone US/Central # Same thing with keys, just run timedatectl list-timezones to find your tz of choice.
+  timedatectl set-ntp true
+#+end_src
+
+** partitioning drives
+*** partitioning with =gdisk=
+
+it's now time to perform our partitioning. as already stated in
+previous sections, it is extremely important that you know the name of
+the drives and which one you intend to install arch linux on. If you
+are like me and plan on keeping the windows 11 install on one of the
+two drives, it is pretty important that you don't accidentally nuke
+the drive it is installed on. In the case of *my* machine:
+- =nvme0n1= is the drive with base windows 11 install. *I do not want to format this drive*
+- =nvme1n1= is the extra ssd that I previously removed bitlocker from. *I want to format this drive*.
+
+with this knowledge in mind, let's start partioning =nvme1n1= with gdisk.
+
+#+begin_src sh
+  root@archiso ~ # gdisk /dev/nvme1n1
+
+  gdisk /dev/nvme1n1
+  GPT fdisk (gdisk) version 1.0.10
+
+  Partition table scan:
+    MBR: protective
+    BSD: not present
+    APM: not present
+    GPT: present
+
+  Found valid GPT with protective MBR; using GPT.
+  Command (? for help):
+#+end_src
+
+This will start the partitioning process. You can enter =?= to see a list of commands, etc.
+
+Before moving on, it needs to be understood that I am about to nuke
+the entire disk. If there is anything you need on this disk, you need
+to immediately quit this guide and go back up your device.
+
+With that said, what now follows is a step-by-step list of the
+formatting commands I will use to format my drive. The result will be
+a disk with two physical partitions. The first partition will be a 1Gb
+EFI boot partition. The second will be the entire rest of the disk
+space.
+
+we want to format =nvme1n1= into two parts. here we go:
+- =o=
+  - overwrite disk
+  - =Y=
+  - =ENTER=
+- =n=
+  - new partition
+  - =ENTER=
+    - default partition 1
+  - =ENTER=
+    - default first sector
+  - =+1G=
+    - make it a gigabyte
+  - =ef00=
+    - make the partition EFI
+- =n=
+  - second partition
+  - =ENTER=
+    - default partition 2
+  - =ENTER=
+    - default start sector
+  - =ENTER=
+    - default to remainder of disk
+  - =ENTER=
+    - default Linux File System 
+- =w=
+  - write changes to disk
+  - =Y=
+
+*** encrypting with =LUKS=
+
+encrypt the second partition
+
+#+begin_src sh
+  cryptsetup luksFormat --hash sha512 /dev/nvme1n1p2
+#+end_src
+
+this encrypts our main partition with the dafaults with only the added
+modification of making the hash SHA512.
+
+**** open container
+
+#+begin_src sh
+  cryptsetup luksOpen /dev/nvme1n1p2 main
+#+end_src
+
+*** backup LUKS header file
+
+with a separate USB (formatted with a linux friendly file system), we
+should go ahead and make a quick backup file of the LUKS header. If
+the header were to ever get destroyed or corrupted, it would be
+impossible to decrypt our partition. This is something that can occur
+from 3rd party libraries that attempt to modify the file partition
+with or without your knowledge. Given the risk, having a backup ready
+is a smart idea.
+
+Using =lsblk=, let's assume that the USB appears as =sdb= with a single =sdb1= partition:
+
+#+begin_src sh
+  mkdir /mnt/backup_usb
+  mount /dev/sdb1 /mnt/backup_usb
+  cryptsetup luksHeaderBackup /dev/nvme1n1p2 --header-backup-file /mnt/backup_usb/arch-LUKS-header-backup-file.img
+  umount /mnt/backup_usb
+#+end_src
+
+*** format partitions 
+**** main
+
+#+begin_src sh
+  # with mkfs.btrfs, -L is the flag for labels. DO NOT USE -n (nodesize).
+  mkfs.btrfs -L main /dev/mapper/main
+#+end_src
+
+**** efi (/boo)
+
+#+begin_src sh
+  # ...but, for mkfs.fat, -n is used to give a name (label) to the partition...
+  mkfs.fat -F32 -n EFI /dev/nvme1n1p1 
+#+end_src
+
+*** create btrfs subvolumes & mount
+
+we are going to follow the arch wiki and create a flat hierarchy for
+subvol management with BTRFS.
+
+#+begin_src sh
+  mount /dev/mapper/main /mnt
+  btrfs sub create /mnt/@
+  btrfs sub create /mnt/@home
+  btrfs sub create /mnt/@snapshots
+  btrfs sub create /mnt/@log
+  btrfs sub create /mnt/@pkg
+  btrfs sub create /mnt/@tmp
+  btrfs sub create /mnt/@docker
+  btrfs sub create /mnt/@postgres
+  btrfs sub create /mnt/@flatpak
+  btrfs sub create /mnt/@swap
+  btrfs sub create /mnt/@btrfs
+  umount /mnt
+#+end_src
+
+
+what the volumes created above are for, in order:
+- / (root)
+- /home
+- /.snapshots
+- /var/log
+- /var/cache/pacman/pkg
+- /var/tmp
+- /var/lib/docker
+- /var/lib/postgres
+- /var/lib/flatpak
+- the root of the btrfs fs itself.
+  - this is made explicit below when mounting. notice how btrfs's subvol is set to 5, the tacit/default root of btrfs itself.
+  - this makes the entire btrfs fs available to us, explicitly, to see.
+  - we don't want to use this as *our* root, however. that's a bad idea.
+- the BTRFS managed swapfile (more on that below)
+
+
+after creating those subvolumes, we unmount main because we're going
+to remount these subvolumes with new options.
+
+as a note: i will probably end up adding more volumes. an immediate
+example would be for the type of files/data stored under
+=~/.cache=. this is the type of data that I wouldn't want to be
+included in system snapshots which is why, eventually, I will need to
+handle those explicitly and separately from my =@home= subvol.
+
+
+with that said, we re-mount the subvolumes to their specific directories.
+
+#+begin_src sh
+  mount -o noatime,nodiratime,compress=zstd,commit=120,space_cache=v2,ssd,discard=async,autodefrag,subvol=@ /dev/mapper/main /mnt
+  mkdir -p /mnt/{boot,home,.snapshots,var/log,var/cache/pacman/pkg,var/tmp,var/lib/docker,var/lib/postgres,var/lib/flatpak,btrfs,swap}
+  mount -o noatime,nodiratime,compress=zstd,commit=120,space_cache=v2,ssd,discard=async,autodefrag,subvol=@home /dev/mapper/main /mnt/home
+  mount -o noatime,nodiratime,compress=zstd,commit=120,space_cache=v2,ssd,discard=async,autodefrag,subvol=@snapshots /dev/mapper/main /mnt/.snapshots
+  mount -o noatime,nodiratime,compress=zstd,commit=120,space_cache=v2,ssd,discard=async,autodefrag,subvol=@log /dev/mapper/main /mnt/var/log
+  mount -o noatime,nodiratime,compress=zstd,commit=120,space_cache=v2,ssd,discard=async,autodefrag,subvol=@pkg /dev/mapper/main /mnt/var/cache/pacman/pkg
+  mount -o noatime,nodiratime,compress=zstd,commit=120,space_cache=v2,ssd,discard=async,autodefrag,subvol=@tmp /dev/mapper/main /mnt/var/tmp
+  mount -o noatime,nodiratime,compress=zstd,commit=120,space_cache=v2,ssd,discard=async,autodefrag,subvol=@docker /dev/mapper/main /mnt/var/lib/docker
+  mount -o noatime,nodiratime,compress=zstd,commit=120,space_cache=v2,ssd,discard=async,autodefrag,subvol=@postgres /dev/mapper/main /mnt/var/lib/postgres
+  mount -o noatime,nodiratime,compress=zstd,commit=120,space_cache=v2,ssd,discard=async,autodefrag,subvol=@flatpak /dev/mapper/main /mnt/var/lib/flatpak
+  mount -o noatime,nodiratime,compress=zstd,commit=120,space_cache=v2,ssd,discard=async,autodefrag,subvolid=5 /dev/mapper/main /mnt/btrfs
+  mount -o noatime,subvol=@swap /dev/mapper/main /mnt/swap
+#+end_src
+
+
+one final aside: all of these options are basically unnecessary. they are simply made explicit here for my own benefit.
+
+furthermore, there is a limitation for how fstab works. when we later
+generate it, you will notice that the mount for @swap will have the
+same options as all the other mount points despite what we specified
+above. that's a known limitation. it doesn't matter after what we are
+about to do. i think. i'm pretty sure. really, is anyone confident
+about anything? not me. anyway—
+
+*** enable swapfile with btrfs
+
+this swapfile will be used exclusively for hibernation only. zram will
+be our actual swap device for swap.
+
+i am setting it to 48gb for my machine.
+
+you could see what linux will estimate your hibernation image size by looking at the following:
+
+#+begin_src sh
+  cat /sys/power/image_size
+#+end_src
+
+by default, this is made to be 2/5ths of system memory. my system has
+64gb. the standard rules for allocating swap space say to alloc the
+size of RAM + a lil more. those rules are mostly outdated. on the
+not-too-crazy assumption i won't be hibernating while in the middle of
+a workload that is consuming a majority of memory, 48gb is a
+reasonable allocation for me.
+
+why swapfile? why BTRFS? this saves me from having to make an
+additional physical disk partition which, in turn, gives me the
+ability to expand, shrink, or delete it later.
+
+now we tell BTRFS to make the swapfile so it knows to not manage the
+subvolume as if it will be used for making snapshots etc later.
+
+#+begin_src sh
+  # this is a one line for the manual mkswap commands but more is needed.
+  btrfs filesystem mkswapfile --size 48g --uuid clear /mnt/swap/swapfile
+  # now we explicitly setup the swapfile and ensure it has the correct
+  # properties, for BTRFS and access permissions
+  truncate -s 0 /mnt/swap/swapfile
+  chattr +C /mnt/swap/swapfile
+  fallocate -l 48G /mnt/swap/swapfile
+  chmod 600 /mnt/swap/swapfile
+  mkswap /mnt/swap/swapfile
+#+end_src
+
+finally, turn it on.
+
+#+begin_src sh
+  swapon /mnt/swap/swapfile
+#+end_src
+
+check in
+
+#+begin_src sh
+  swapon --show
+#+end_src
+
+you should see a swapfile now and it should have a low priority. this
+is good because we only want to use this for hibernation, ie we don't
+want this file to be used for anything else, non-hibernation swapping included.
+
+*** mount ESP
+
+originally tried =/efi= but there's several limitations to choosing
+this directory such that, without falling back to using GRUB etc, it
+does not work well with systemd-boot. i lost a solid day and a half
+because of a cascade of misunderstandings that fell downstream from
+this fact. you can setup a system on =/efi= instead of =/boot= but you
+have been warned. read the arch wiki carefully when departing on this
+path.
+
+that aside, let's move on and mount our =/boot=
+
+#+begin_src sh
+  # want to ensure the correct read/write permissions are given to /boot
+  mount -o uid=0,gid=0,fmask=0077,dmask=0077 /dev/nvme1n1p1 /mnt/boot
+#+end_src
+
+** bootstrap arch
+*** update mirrors
+
+try to get better mirrors for bootstrapping
+
+#+begin_src sh
+reflector -c US,CA,IS --latest 10 --sort rate --save /etc/pacman.d/mirrorlist
+#+end_src
+
+*** pacstrap
+
+i'm going to add nano as a default along with mg, an emacs-like editor.
+
+since i'm ssh'ing for this install and i'm using kitty, =kitty-terminfo= ensures that terminal variables are set correctly
+for e.g. editing files..
+
+#+begin_src sh
+pacstrap /mnt base base-devel linux linux-firmware mg nano kitty-terminfo
+#+end_src
+
+you may see a stray ="error: command failed to execute correctly"=. This is actually a warning, not a hard error. So long as the packages install successfully, everything is ok.
+
+*** generate fstab
+
+#+begin_src sh
+genfstab -U -p /mnt >> /mnt/etc/fstab 
+#+end_src
+
+you can check the contents of fstab.
+
+#+begin_src sh
+  nano /mnt/etc/fstab
+#+end_src
+
+make sure that =/boot= has correct permissions while you are there.
+
+here's an example of an =/boot= entry with *incorrect* permissions. 
+
+#+begin_src conf
+  # /dev/nvme1n1p1 LABEL=EFI
+  #                                                        NOTE: fmask and dmask have incorrect permissions! Simply change them to 0077.
+  UUID=7986-93D2          /boot            vfat            rw,relatime,fmask=0022,dmask=0022,codepage=437,iocharset=ascii,shortname=mixed,utf8,errors=remount-ro   0 2
+#+end_src
+
+if you don't have these correct, =bootctl= will later complain about it.
+
+in theory, you should be able to delete the entry for =/boot= entirely as =systemd-boot= is supposed to manage it automatically but I had no issues so... 🤷
+
+moving on, it's important to also make sure that swap is configured correctly. is should look like this:
+#+begin_src sh
+  /swap/swapfile          none            swap            defaults        0 0
+#+end_src
+
+cool. moving on.
+
+*** arch-chroot
+
+#+begin_src sh
+  arch-chroot /mnt
+#+end_src
+
+** configure arch install
+*** enable multilib
+
+edit =/etc/pacman.conf= by uncommenting the following lines:
+
+#+begin_src conf
+  # [multilib]
+  # Include = /etc/pacman.d/mirrorlist
+#+end_src
+
+make sure it is =[multilib]= and not =[multilib-testing]=.
+
+sync pacman db
+
+#+begin_src sh
+  pacman -Sy
+#+end_src
+*** local time & locale
+
+#+begin_src sh
+  ln -sf /usr/share/zoneinfo/US/Central etc/localtime
+  hwclock --systohc
+  mg -n /etc/locale.gen # uncomment en_US.UTF-8
+  locale-gen
+  echo "LANG=\"en_US.UTF-8\"" > /etc/locale.conf # Not the same thing as previous command & some applications need this. *shrug*
+  echo "KEYMAP=us" > /etc/vconsole.conf # this makes our keyboard config permanent
+  # Next command will not work if you don't end up installing terminus-font
+  echo "FONT=ter-132n" >> /etc/vconsole.conf # make the previous HiDPI font config permanent, too.
+#+end_src
+
+*** hostname
+
+#+begin_src sh
+echo "HOST_NAME_OF_CHOICE" >> /etc/hostname
+#+end_src
+
+and then create a hostsfile:
+#+begin_src sh
+  mg -n /etc/hosts
+#+end_src
+
+and past the following:
+#+begin_src conf
+  127.0.0.1	localhost
+  ::1		localhost
+  127.0.1.1	HOSTNAME.localdomain	localhost
+#+end_src
+
+where =HOSTNAME= is the hostname you just echoed into =/etc/hostname=.
+*** root user passwd
+
+not the same as the root user we created in the live iso. this is the real deal this time.
+
+#+begin_src sh
+  passwd 
+#+end_src
+
+*** install some more packages
+
+TODO: maybe breakout font shit and non-core system stuff further
+below along with when we setup desktop stuff.
+
+TODO: emphasize that downstream configs are made on the assumption
+these packages have been installed. Several sections will simply not
+work without them.
+
+Note, I am *installing kernel modules for NVIDIA and intel's microcode*
+(=intel-ucode=). If you don't have NVIDIA or intel on your machine,
+you shouldn't be installing these lol.
+
+#+begin_src sh
+  pacman -S linux-headers linux-lts linux-lts-headers os-prober dkms intel-ucode nvidia-open-dkms \
+	 nvidia-utils nvidia-settings opencl-nvidia efivar edk2-shell efibootmgr sudo git pigz lbzip2 \
+	 networkmanager iwd plymouth openssh zsh zsh-completions dosfstools gptfdisk btrfs-progs \
+	 terminus-font ttf-dejavu ttf-liberation noto-fonts ttf-fira-code cantarell-fonts libfido2 \
+	 firefox chromium
+#+end_src
+
+*** create user
+
+let's make a new user. let's make you. welcome home to this terrible prison of steel and silicon.
+
+#+begin_src sh
+  useradd -m -g users -G wheel -s /bin/zsh USERNAME
+#+end_src
+
+setup password
+
+#+begin_src sh
+  passwd USERNAME
+#+end_src
+
+enable wheel group to have sudo priveledges 
+
+#+begin_src sh
+  EDITOR=nano visudo # or just visudo if you're comfortable with vi
+#+end_src
+
+find the following lines:
+#+begin_src conf
+  ## Uncomment to allow members of group wheel to execute any command
+  # %wheel ALL=(ALL) ALL
+#+end_src
+
+and uncomment the second line:
+#+begin_src conf
+  ## Uncomment to allow members of group wheel to execute any command
+  %wheel ALL=(ALL) ALL # this line. the second line. right here.
+#+end_src
+
+go ahead and test your user. if you installed zsh like i did above,
+you'll get hit with the new user prompt. you can walk through it (it's
+pretty short and straightforward) or just skip. if you want to do it
+later, it will tell you how to do that, too.
+
+#+begin_src sh
+  sudo -iu USERNAME # this will probably throw an "unable to find terminal name for device..." error, that's expected here.
+  archiso% sudo pacman -Sy # this should prompt for your user's password. if everything is alright, you'll successfully sync pacman's packages.
+  archiso% exit # you could do the rest of this guide as your user. you just need to start using sudo, of course.
+#+end_src
+
+*** update mkinitcpio
+
+#+begin_src sh
+  mg -n /etc/mkinitcpio.conf
+#+end_src
+
+add nvidia modules and btrfs.
+
+#+begin_src conf
+  MODULES=(nvidia nvidia_modeset nvidia_uvm nvidia_drm btrfs)
+#+end_src
+
+as an aside, I'm fairly sure that btrfs is not necessary here as a module. sorry, this is what you get when you use someone else's guide. the arch mods were right :)
+
+moving on, update our HOOKS to use systemd, microcode, and the correct encryption module.
+#+begin_src conf
+  HOOKS=(base systemd keyboard autodetect microcode modconf sd-vconsole block filesystems sd-encrypt fsck)
+#+end_src
+
+At this point, I need to warn that =kms= should not be in the above
+stanza. NVIDIA handles its own kms. Using the =kms= module risks
+enabling =nouveau= which would conflict with nvidia.
+
+the =systemd= hook provides a lot of services for us that otherwise
+require several more hooks when using =busybox=. this includes support
+for =hibernation=.
+
+*** regenerate initramfs
+
+#+begin_src sh
+  mkinitcpio -p linux
+  mkinitcpio -p linux-lts
+#+end_src
+
+be mindful to specifically note a log message for =Early uncompressed CPIO image generation successful=.
+This tells us that our =microcode= hook is working correctly.
+
+** setup bootloader
+*** bootctl install
+
+#+begin_src sh
+  bootctl install
+#+end_src
+
+if everything goes to plan, we should now have a =/boot= directory
+with a basic UEFI boot manager copied over for us along with a basic
+UEFI boot entry for "Linux Boot Manager".
+
+if things don't go right, or if you have issues later with boot
+options, checkout what =bootctl list= reports. it will tell you when
+it sees entries and when something is wrong with them.
+
+*** loader conf
+
+pretty simple. we need to tell the bootloader how to boot our images of arch linux.
+
+first we set the defaults
+
+#+begin_src sh
+  mg -n /boot/loader/loader.conf
+#+end_src
+
+#+begin_src conf
+  default arch.conf
+  timeout 5
+  editor no
+  console-mode auto
+#+end_src
+
+*** entries confs
+
+now we add the boot entries. before we do that, however, let's grab
+the offset for our swapfile partition that is handled by btrfs:
+
+#+begin_src sh
+  btrfs inspect-internal map-swapfile -r /swap/swapfile
+#+end_src
+
+you'll get a number. keep ahold of that number. we're going to  use that in our arch.conf below for our =resume_offset= kernel parameter.
+
+finally, grab the UUID for the LUKS partition:
+
+#+begin_src sh
+  blkid | grep nvme1n1p2
+#+end_src
+You should get a UUID in the general form of =xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx=. you're going to need that.
+
+now create the arch.conf
+
+#+begin_src sh
+  mg -n /boot/loader/entries/arch.conf
+#+end_src
+
+copy and past the following entry. Note that you must replace the values
+- =UUID=
+- =NAME_OF_LUKS_VOLUME=
+- =NAME_OF_LUKS_VOLUME_WITH_SWAPFILE=
+- =BTRFS_OFFSET=
+
+In our case, =NAME_OF_LUKS_VOLUME= and =NAME_OF_LUKS_VOLUME_WITH_SWAPFILE= are the same thing, =main=, because we're using a swapfile provisioned by BTRFS.
+
+=BTRFS_OFFSET= and =UUID= are the values we just obtained above, substitute those accordingly as well.
+
+once again, I must emphasize that I am setting up my laptop to use
+NVIDIA graphics with Intel. This influences the choice of kernel
+parameters used below. You are going to need different parameters if
+your hardware is different. It is as shrimple as that 🦐.
+
+#+begin_src conf
+  title Arch Linux
+  linux /vmlinuz-linux
+  initrd /initramfs-linux.img
+  options rd.luks.name=UUID=NAME_OF_LUKS_VOLUME root=/dev/mapper/NAME_OF_LUKS_VOLUME rootflags=subvol=@ resume=/dev/mapper/NAME_OF_LUKS_VOLUME_WITH_SWAPFILE resume_offset=BTRFS_OFFSET nvidia-drm.modeset=1 NVreg_PreserveVideoMemoryAllocations=1 nvidia.NVreg_TemporaryFilePath=/var/tmp sysrq_always_enabled=1 nowatchdog splash quiet loglevel=3 systemd.show_status=auto rd.udev.log_level=3 vt.global_cursor_default=0 rw
+#+end_src
+
+with the above config, we should have a fairly silent (not a wall of text) boot that ensures hibernation works, including all of NVIDIA's graphic memory.
+
+*TODO* enumerate kernel options explicitly with notes on what they do
+- https://wiki.archlinux.org/title/Silent_boot
+- https://wiki.archlinux.org/title/NVIDIA#DRM_kernel_mode_setting
+
+make a copy of it for linux-lts
+
+#+begin_src sh
+  cp /boot/loader/entries/arch.conf /boot/loader/entries/arch-lts.conf
+#+end_src
+
+and just change the =linux= and =initrd= lines to their lts versions
+
+#+begin_src conf
+  title Arch Linux LTS
+  linux /vmlinuz-linux-lts
+  initrd /initramfs-linux-lts.img
+  options rd.luks.name=UUID=NAME_OF_LUKS_VOLUME root=/dev/mapper/NAME_OF_LUKS_VOLUME rootflags=subvol=@ resume=/dev/mapper/NAME_OF_LUKS_VOLUME_WITH_SWAPFILE resume_offset=BTRFS_OFFSET nvidia-drm.modeset=1 NVreg_PreserveVideoMemoryAllocations=1 nvidia.NVreg_TemporaryFilePath=/var/tmp sysrq_always_enabled=1 nowatchdog splash quiet loglevel=3 systemd.show_status=auto rd.udev.log_level=3 vt.global_cursor_default=0 rw
+#+end_src
+
+we can also add another one for the fallback initramfs for each
+version of linux. these confs only differ by their =initrd= file
+because the purpose of a fallback is to provide a (hopefully)
+functional fallback initramfs for that given version of linux.
+
+#+begin_src sh
+  cp /boot/loader/entries/arch.conf /boot/loader/entries/arch-fallback.conf
+#+end_src
+
+#+begin_src sh
+  title Arch Linux Fallback
+  linux /vmlinuz-linux
+  initrd /initramfs-linux-fallback.img
+  options rd.luks.name=UUID=NAME_OF_LUKS_VOLUME root=/dev/mapper/NAME_OF_LUKS_VOLUME rootflags=subvol=@ resume=/dev/mapper/NAME_OF_LUKS_VOLUME_WITH_SWAPFILE resume_offset=BTRFS_OFFSET nvidia-drm.modeset=1 NVreg_PreserveVideoMemoryAllocations=1 nvidia.NVreg_TemporaryFilePath=/var/tmp sysrq_always_enabled=1 nowatchdog quiet splash rw
+#+end_src
+
+note how line #2 is identical to the original. it's only =/initramfs-linux-fallback.img= that is different.
+
+you can do this again for the lts version, too.
+
+*** plymouth config
+
+this is entirely optional but =plymouth= provides an alternative boot
+screen that looks a smidge nicer than what you'll otherwise get when
+presented with LUKS decryption prompt.
+
+First, add =plymouth= to =HOOKS= in =mkinitcpio.conf=. It is critical
+that you place it *before* =sd-encrypt= but *after*  =systemd=.
+
+#+begin_src conf
+  #                   V here V
+  HOOKS=(base systemd plymouth keyboard autodetect microcode modconf sd-vconsole block filesystems sd-encrypt fsck)
+#+end_src
+
+if you are using plymouth, I cannot emphasize enough how important it is that you did the above edit.
+
+Now make a config:
+
+#+begin_src sh
+  nano /etc/plymouth/plymouthd.conf
+#+end_src
+
+I'm choosing the =solar= boot screen. it boots a blue solar flare screen. it is simple but works. we can add something cooler later (see below)
+
+#+begin_src conf
+  [Daemon]
+  Theme=solar
+  DeviceScale=1
+#+end_src
+
+let's rebuild our kernels again
+
+#+begin_src sh
+  mkinitcpio -p linux
+  mkinitcpio -p linux-lts
+#+end_src
+
+Note: you could use the plymouth cli command instead of the above. it
+works well but the above conf file is a good self-note for scaling the
+display in case that is needed in the future.
+
+regardless, you can use the cli tool to get a list of plymouth themes that are shipped by default:
+#+begin_src sh
+  plymouth-set-default-theme --list
+#+end_src
+
+and to set it:
+#+begin_src sh
+  plymouth-set-default-theme -R solar
+#+end_src
+
+when does this way, you'll note that our =initramfs= is automatically rebuilt for us.
+
+*** networkmanager
+
+#+begin_src sh
+  systemctl enable NetworkManager
+#+end_src
+
+*** optimize makepkg
+
+- https://wiki.archlinux.org/title/Makepkg#Compression
+
+
+there's a lot of other optimizations but they're much more
+questionable and are probably best configured on package-specific
+basis if they were justified.
+
+however, improving compression is an easy and clear win. this assumes
+you installed all of the compression packages from the package install
+provided earlier. 
+
+open the conf file:
+
+#+begin_src sh
+  mg -n /etc/makepkg.conf
+#+end_src
+
+and comment out the defaults for the following entries.
+
+#+begin_src conf
+  COMPRESSZST=(zstd -c -T0 --auto-threads=logical -)
+  COMPRESSGZ=(pigz -c -f -n)
+  COMPRESSBZ2=(lbzip2 -c -f)
+  # if aur helper installed, could go even further by installing plzip
+  # COMPRESSLZ=(plzip -c -f)
+#+end_src
+
+TODO: leveraging tmpfs by default is a solid config optimization
+
+*** enable ssh
+
+#+begin_src sh
+  systemctl enable sshd
+#+end_src
+*** enable bluetooth
+
+#+begin_src sh
+  systemctl enable bluetooth
+#+end_src
+*** fstrim
+
+#+begin_src sh
+  systemctl enable fstrim.timer
+#+end_src
+*** setup nvidia hibernation services
+
+some of these ought to be handled by default given the DE of choice but you should go ahead and do this yourself:
+
+#+begin_src sh
+  systemctl enable nvidia-suspend
+  systemctl enable nvidia-hibernate
+  systemctl enable nvidia-resume
+#+end_src
+
+*** audio
+- https://github.com/mikeroyal/PipeWire-Guide#Installing-PipeWire-on-Arch-Linux
+
+install the following:
+
+#+begin_src sh
+  pacman -S pipewire wireplumber pipewire-alsa alsa-utils sof-firmware alsa-firmware
+#+end_src
+
+and then enable the following *user* services:
+
+#+begin_src sh
+  systemctl --user enable pipewire.socket
+  systemctl --user enable pipewire-pulse.socket
+  systemctl --user enable wireplumber
+#+end_src
+
+KDE should handle the rest elegantly when you reboot into the system
+(more on that below). If that doesn't turn out to be the case, come
+back to this section and try checking the =status= for each of these
+services.
+
+** install a DE ig
+*** SDDM
+
+this is our login manager. if you're using gnome, you'll need =GDM= instead. I don't recommend mixing and matching my configs with that.
+
+#+begin_src sh
+  pacman -S sddm && systemctl enable sddm
+#+end_src
+
+*** KDE
+
+I used KDE last time I installed arch and it was the best desktop
+experience of my life. I am not even joking. It Just Worked for
+everything I cared about and was less buggy/clunky than Gnome which I
+had used for years with Ubunto. This remains the case as I type this
+on KDE Plasma 6.
+
+This time, however, my install will be a smidge more slim. Instead of
+installing large meta packages for KDE applications (no insult
+implied, btw!), I'm installing =plasma= + applications that I know I
+will want from the get-go. I will definitely be installing more as I
+go along and realize I am missing something lol.
+
+#+begin_src sh
+  sudo pacman -S plasma konsole dolphin ark kwrite spectacle krunner partitionmanager gwenview okular
+#+end_src
+
+you're going to be given a lot of options. i went with defaults (don't
+choose a number, just press =ENTER=) with the *exception of audio*
+where i chose =pipewire-jack=, which uses =pipewire=, a forward
+looking library for audio on linux. *you should do this too if you're
+following my guide*.
+
+*** sysreq
+the kernel is already configured to use this from the mkinitcpio.conf
+section and no further action is required. this is just a section
+acknowledging it. =SysRq= is typically the print screen button. read
+about it [[https://wiki.archlinux.org/title/Keyboard_shortcuts#Kernel_(SysRq)][here]].
+
+
+this is just something useful to remember for when/if the system ever
+becomes unresponsive beyond save. in theory, you should still be able
+to kill it with these keystrokes.
+
+
+At minimum, good shortcuts to remember:
+- =Alt+SysRq+b= (Alt+PrintScreen b) will reboot a system.
+- =Alt+SysRq+e= will send SIGTERM to *all* processes to terminate gracefully
+- =Alt+SysRq+i= will SIGKILL *all* processes, forcing immediate termination
+
+
+Notes and exceptions to keep in mind:
+- On laptops that use Fn key to differentiate SysRq from PrintScreen,
+  it may not actually be necessary to use the Fn key (i.e.,
+  Alt+PrintScreen+letter could work).
+- On Lenovo laptops (outside of their Legion lineup) SysRq is often
+  configured as Fn+S. To use it press and hold Alt then press Fn+s,
+  release Fn and s still holding Alt followed by the keys above.
+- sometimes you need to use the right-side Alt, not the
+  leftside. Apparently this can only be expected of the reboot sequence lol.
+
+** restart and login
+
+#+begin_src sh
+  exit
+  reboot
+#+end_src
+
+here's hoping.
+
+make sure to take your liveUSB out of the machine before it finishes
+rebooting or else you'll just reboot into the archISO. if you don't
+see the boot entry screen for arch, reboot into the UEFI menu and make
+sure that the linux bootloader option is at the top (above windows,
+etc).
+
+if that doesn't fix things... time to start reading the arch wiki 😎.
+
+* Post-install configurations
+You should get ZRAM and an AUR helper setup at the minimum. It will be
+quick if you just follow what I documented below.
+** setup zram
+*** config
+
+#+begin_src sh
+  pacman -S zram-generator
+  nano /etc/systemd/zram-generator.conf
+#+end_src
+
+#+begin_src conf
+  [zram0]
+  zram-size = ram / 4 # 64gb => 16gb of ZRAM
+  compression-algorithm = zstd
+#+end_src
+
+let's optimize it
+
+#+begin_src sh
+  nano /etc/sysctl.d/99-vm-zram-parameters.conf
+#+end_src
+
+#+begin_src conf
+  vm.swappiness = 180
+  vm.watermark_boost_factor = 0
+  vm.watermark_scale_factor = 125
+  vm.page-cluster = 0
+#+end_src
+
+*** enable
+can't do this in chroot
+#+begin_src sh
+  sudo systemctl daemon-reload
+  sudo systemctl start systemd-zram-setup@zram0.service
+  # make sure zram is goin
+  zramctl
+  # check and see what's going on
+  swapon
+#+end_src
+** aur helper
+yay is older, well established. paru is a bit newer. idc, really.
+*** paru-bin
+we're going to install the paru-bin version because this avoids pulling in rust as a system managed dependency.
+
+#+begin_src sh
+  mkdir -p ~/.cache/paru
+  cd ~/.cache/paru
+  git clone https://aur.archlinux.org/paru-bin.git
+  cd paru-bin
+  makepkg -si
+#+end_src
+
+you should now have =paru= on your path; if not, try opening a new shell.
+
+once you have paru on your system, you can delete the directory we just made.
+#+begin_src sh
+    rm -rf ~/.cache/paru/paru-bin
+    # update everything
+    paru
+    # "reinstall" paru-bin, even.
+    # this just re-installs the AUR build artifacts under Paru's default config folder, ~/.cache/paru/clone
+    paru -S paru-bin
+#+end_src
+
+you can use paru to handle everything else from here.
+
+** IDEs
+*** emacs
+a lot of people don't know this, but GTK/QT apps can have less latency
+than their terminal equivalent, emacs included!
+
+this version is compiled with the gccjit flag *and* uses a pure gtk3
+UI which provides performance improvements.
+#+begin_src sh
+  sudo pacman -S emacs-wayland
+#+end_src
+
+i have a lot of other stuff i want to do with my emacs so I'll leave it at that for now.
+
+*** vscode
+
+it's nice to have another, much more popular, editor on my system,
+especially for collaboration and copying dev tooling/code environments
+for contributions, etc.
+
+let's install =vscodium= and some hooks that provide more of the
+expected functionality of vscode (but without microsoft):
+
+#+begin_src sh
+  paru -S vscodium-bin vscodium-bin-marketplace vscodium-bin-features
+#+end_src
+
+this gets us the binary for vscodium + adds two sets of patches that
+provide access to the extension marketplace + enables additional
+features that are disabled by default.
+
+IME, for whatever reason, the first time I ran =VSCodium - Wayland=
+(the desktop shortcut produced by =vscodium-bin= for Wayland systems),
+it caused a spike in CPU and didn't originally render the
+window. I don't know why this happened but right clicking the app icon
+and moving it to a different monitor made it visible/render
+correctly. The behavior did not replicate the few times I re-opened it
+afterwards, thankfully.
+
+** ssh
+*** import ssh
+so i want to re-use a private key. first:
+#+begin_src sh
+  mkdir -p ~/.ssh
+#+end_src
+
+assuming I have it on a USB & it's mounted:
+#+begin_src sh
+  cp /run/media/<USER>/<USB>/id_ed25519* ~/.ssh
+  chmod 700 ~/.ssh
+  chmod 600 ~/.ssh/id_ed25519
+  chmod 600 ~/.ssh/id_ed25519.pub
+#+end_src
+*** ssh-agent
+i would like my key to be handled across all terminals but i'm cool
+not using an auto-login mechanism via KDE (or some other tool).
+
+#+begin_src sh
+  sudo pacman -S keychain
+#+end_src
+
+and then in my =.zshrc=:
+#+begin_src zsh
+  # add key names as necessary
+  eval $(keychain --eval --quiet --agents ssh id_ed25519)
+#+end_src
+
+and then in my terminal:
+#+begin_src sh
+  source ~/.zshrc
+#+end_src
+
+you should be prompted for the key's password.
+
+i like to use github to test my ssh:
+#+begin_src sh
+  ssh -T git@github.com
+#+end_src
+
+you should get a congratulations message if everything is setup correctly.
+
+** additional plymouth themes
+
+after successfully booting once with one of the pre-packaged plymouth themes, you can add some spice via the =plymouth-themes= repo.
+- https://github.com/adi1090x/plymouth-themes
+
+
+please note that *I had some initial issues* when using themes from
+this repository but this was when I tried to pre-emptively install a
+custom theme *before* booting and unlocking my KDE configured system
+for the first time.
+
+finally, beware of decrypt password issue & solution: https://github.com/adi1090x/plymouth-themes/issues/43#issuecomment-2212544121
+  - in theory, this *should not* be an issue for us. =cantarell-fonts= and =ttf-dejavu= are installed and should be used.
+
+ones I really like:
+- Cross Hud, #17 in repo, https://aur.archlinux.org/packages/plymouth-theme-cross-hud-git
+- Hud 3, #44 in repo, https://aur.archlinux.org/packages/plymouth-theme-hud-3-git (close second)
+- Rings, #62 in repo, https://aur.archlinux.org/packages/plymouth-theme-rings-git
+- Seal 2, #67 in repo, https://aur.archlinux.org/packages/plymouth-theme-seal-2-git (i think favorite)
+- Square Hud, #75 in repo, https://aur.archlinux.org/packages/plymouth-theme-square-hud-git
+- Target 2, #77 in repo, https://aur.archlinux.org/packages/plymouth-theme-target-2-git (close second)
+
+
+installing & using themes is straightforward from the README:
+#+begin_src
+  git clone https://github.com/adi1090x/plymouth-themes.git
+  cd plymouth-themes
+
+  # copy into plymouth theme directory
+  sudo cp -r angular /usr/share/plymouth/themes/
+
+  # check if theme exist in dir, it should be shown in the list
+  sudo plymouth-set-default-theme -l
+
+  # now set the theme (angular, in this case) and rebuilt the initrd
+  sudo plymouth-set-default-theme -R angular
+#+end_src
+
+**** advice on testing
+
+IMO, you might want to leave your =lts= image untouched from
+plymouth. Why? this gives you a system you can cleanly boot into on
+the off-chance a new plymouth theme doesn't work. This saves you the
+trouble of having to use a recovery USB etc to get back into the
+system and change/disable plymouth.
+
+In other words, modify =/boot/loader/entries/linux-lts.conf= and add =plymouth.enable=0 disablehooks=plymouth= to the kernel parameters.
+
+**** smooth transition
+
+*I personally didn't see the need for this*. You are free to use it, however.
+
+Create the following service:
+
+#+begin_src sh
+  mg -n /etc/systemd/system/display-manager.service.d/plymouth.conf
+#+end_src
+
+with the following:
+
+#+begin_src conf
+  [Unit]
+  Conflicts=plymouth-quit.service
+  After=plymouth-quit.service rc-local.service plymouth-start.service systemd-user-sessions.service
+  OnFailure=plymouth-quit.service
+
+  [Service]
+  ExecStartPost=-/usr/bin/sleep 30
+  ExecStartPost=-/usr/bin/plymouth quit --retain-splash
+#+end_src
+
+** dual boot windows using systemd-boot via edk2-shell
+*** a preface
+when I first did this, I had no issues with bitlocker and launching from the Arch managed bootloader.
+
+however, upon re-install on my new SSD, bitlocker did nothing but give
+me issues. As a result, I was forced between choosing an encrypted
+windows partition and using a single bootloader to launch. For now, I
+have decrypted the windows partition for the sake of ease-of-use but I
+plan on trying to re-encrypt it later and see if that fixes the
+problem (decrypting & then re-encrypting). I doubt it will, but I'll try lol.
+
+*** configuring with edk2
+
+- tutorial: https://forum.endeavouros.com/t/tutorial-add-a-systemd-boot-loader-menu-entry-for-a-windows-installation-using-a-separate-esp-partition/37431
+  
+cp edk2-shell into =/boot/=, systemd-boot will automatically detect it and add it to the boot options.
+#+begin_src sh
+  cp /usr/share/edk2-shell/x64/Shell.efi /boot/shellx64.efi
+#+end_src
+recall the windows partition with window's EFI, nvme0n1p1
+
+check blkid for the PARTUUID of that partition:
+#+begin_src sh
+  blkid
+  # something like this
+  /dev/nvme0n1p1: LABEL="SYSTEM" UUID="7C1C-4DAE" BLOCK_SIZE="512" TYPE="vfat" PARTLABEL="EFI system partition" PARTUUID="e0549dce-0997-4db7-ba2f-d3f1df67ade7"
+#+end_src
+
+mine was =0549dce-0997-[SNIP]-d3f1df67ade7=.
+
+restart machine. choose the UEFI shell option. it should automatically
+list the device mappings. look for the device alias that has the same
+PARTUUID.
+
+mine was =FS1:HD1b;BLK7=. You can theoretically go with any of these
+three, =FS1=, =HD1b=, and =BLK7=, but IME the latter two are liable to
+change (and thus break the boot entry) whereas =FS1= hasn't changed
+across the several times I've had to play with this.
+
+run =exit= and reboot into liveusb/arch and create the following file:
+
+#+begin_src sh
+  nano /boot/loader/entries/windows.nsh
+#+end_src
+
+with the full EFI path:
+#+begin_src conf
+  <ALIAS>:EFI\Microsoft\Boot\Bootmgfw.efi
+#+end_src
+
+where =<ALIAS>= is the alias of your specific windows EFI (=FSX=,
+=HDXY=, =BLKX=). As previously mentioned, I chose to go with =FS1=:
+#+begin_src conf
+  FS1:EFI\Microsoft\Boot\Bootmgfw.efi	  
+#+end_src
+
+now just make the boot entry for windows at =/boot/entries/windows.conf=:
+#+begin_src conf
+  title Windows
+  efi   /shellx64.efi
+  options -nointerrupt -exit windows.nsh
+#+end_src
+
+some additional options:
+#+begin_src sh
+  # optional, hides default UEFI shell greeting
+  -nomap -noversion
+  # hide addition unnecessary output from UEFI
+  -noconsoleout
+#+end_src
+
+aside: instead of using a =windows.nsh= file, you can just inline the
+path in the following conf file. Just replace =windows.nsh= 1:1 with the full path enumerated above.
+
+reboot and you should see windows in the boot menu! You should test it out. If it doesn't work, it may be related to the same issue I had above when using aliases *other than* the =FSX= variant.
+
+** TODO secure sudo
+*** root logins
+** TODO finger print for sudo/login 
+- https://wiki.archlinux.org/title/Fprint
+
+
+going by the list of known devices with support, we can see that my
+Lenovo P1 G7 has a compatible device with the following command:
+#+begin_src sh
+  # 27c6:6594 == Goodix MOC Fingerprint Sensor
+  lsusb | grep "27c6:6594"
+#+end_src
+
+using fprintd has implications. a big one is that =S3= style Suspend
+to RAM cannot be used. However, without changing UEFI settings, the
+system is defaulted to =s2idle=, which is compatible with =fprintd=.
+
+I'm not sure I want to use it, yet.
+
+given that it is supported, lets install the following:
+#+begin_src sh
+  sudo pacman -S fprintd
+#+end_src
+
+*** enable sudo with fprint
+first, open =/etc/pam.d/sudo= and add the following line to the top of the file:
+#+begin_src conf
+  auth	sufficient	pam_unix.so try_first_pass pam_fprintd.so likeauth nullok
+  auth	sufficient	pam_fprintd.so
+#+end_src
+
+*** sudo with fingerprint would be pretty cool
+** TODO btrfs optimizations
+*** TODO additional subvolumes for the caches of user installed/managed applications
+- =~/.cache/= or, at least, specific subdirectories
+*** TODO maintenance
+- https://github.com/kdave/btrfsmaintenance
+*** TODO deduping
+- https://github.com/Zygo/bees
+*** TODO snapshots (snapper)
+** TODO dotfiles
+** TODO more NVIDIA?
+*** enable =nvidia_drm.fbdev=1=?
+- at end of 1.2 section: https://wiki.archlinux.org/title/NVIDIA#DRM_kernel_mode_setting
+** TODO power management
+*** TODO s3 vs s2idle
+turns out my device is set to s2idle by default. running:
+#+begin_src sh
+  cat /sys/power/mem_sleep
+#+end_src
+
+returns =[s2idle]=, which is the newer approach to sleep. instead of
+suspending entirely to RAM, the system will still intermittantly "wake
+up" and check wifi, etc.
+
+This is *inferior* to true Suspend to RAM, ie S3.
+
+changing this would be a major gain to power saving when not connected
+to a power source...
+
+however, switching to s3 would mean =fprintd= is not usable (assuming I want to use it).
+*** TODO NVIDIA-PRIME
+  - https://wiki.archlinux.org/title/PRIME#NVIDIA
+  - https://archlinux.org/packages/extra/any/nvidia-prime/
+  - might be able to automate most of it: https://aur.archlinux.org/packages/nvidia-prime-rtd3pm
+  - also https://github.com/Askannz/optimus-manager
+*** TODO acpid (?)
+*** TODO tlp (?)
+
+*** TODO fan management?
+** clean out bad/old linux bootloaders in UEFI menu
+efibootmgr to the rescue
+- https://superuser.com/questions/1552127/how-to-delete-extra-os-entries-from-bios
+- https://www.reddit.com/r/archlinux/comments/1ajpei8/efi_boot_environment_cleanup/
+
+
+using the [[https://wiki.gentoo.org/wiki/Efibootmgr#Listing_boot_entries][gentoo guide]], find entries:
+#+begin_src sh
+  efibootmgr
+#+end_src
+
+each is identified as =BootXXXX= where =XXXX= is a number.
+
+to removie an entry:
+
+#+begin_src sh
+  efibootmgr -b <XX> -B
+#+end_src
+
+be careful lol
+** TODO [0/3] Yubikey 2FA
+
+https://github.com/agherzan/yubikey-full-disk-encryption
+
+"It's recommended to have already working encrypted system setup with
+encrypt hook and non-ykfde passphrase before starting to use ykfde
+hook with ykfde passphrase to avoid potential misconfigurations."
+
+ - [ ] 164-bit non-2FA key
+ - [ ] 2FA based key
+ - [ ] 2FA based key (backup)
+
+*Alternatively*, could use
+ https://github.com/Yubico/yubikey-personalization-gui (in theory) to
+ do the same while also producing backup keys for recovery...
+** TODO Secure Boot (could brick device, lmfao)
+- should be able to go with "use your own keys" section
+  - appears that users who bricked their devices just did things wrong. still bad but not as scary.
+    - also looks like several cases are related to oracle tooling for enterprise provisioning (lmfao)
+  - users on lenovo also further report no issue when following the arch guide as instructed (https://forums.lenovo.com/t5/ThinkPad-T400-T500-and-newer-T-series-Laptops/Own-secure-boot-keys-on-T14/m-p/5069436?page=1#5276410)
+    - a guide directly linked to by users in the forum: https://wiki.gentoo.org/wiki/User:Sakaki/Sakaki%27s_EFI_Install_Guide/Configuring_Secure_Boot
+  - users also reporting success with lenovo p1 gen 6 (https://www.reddit.com/r/archlinux/comments/10pq74e/my_easy_method_for_setting_up_secure_boot_with)
+  - the warning at the top is about completely wiping system keys and it appears that sbctl re-installs those keys when done correctly (https://wiki.archlinux.org/title/Unified_Extensible_Firmware_Interface/Secure_Boot#Using_your_own_keys)
+  - should be able to use with systemd-boot just fine (https://www.reddit.com/r/archlinux/comments/xzr9ro/how_to_boot_with_secureboot_enabled_in_systemdboot/)
+  - user reporting bricking on NVIDIA with secure boot was false alarm, just followed guide correctly and worked: https://www.reddit.com/r/archlinux/comments/pec41w/secure_boot_selfsigned_keys_nvidia_gpu_bricked/
+  - random guide that seems to confirm general premise working by using the standard sbcli workflow: https://gist.github.com/Th3Whit3Wolf/0150bd13f4b2667437c55b71bfb073e4
+** TODO hyprland seems nice
+** TODO tmpfs for makepkg
+** TODO dotfiles & gnu stow
+** TODO racer 3 kbd configs
+- not OS per se lol
+- https://images-na.ssl-images-amazon.com/images/I/71V7fO4UjpL.pdf
+** TODO handle warnings about =Possibly missing firmware=
+You are basically guaranteed to get warnings of the general format:
+#+begin_src
+  => WARNING: Possibly missing firmware for module: '$MODULE_NAME'
+#+end_src
+
+Even funnier, you will get different warnings between the build for
+the default (i.e. =initramfs-linux=, =initramfs-linux-lts=) image and the fallback versions.
+
+For my machine, on a clean install, I got the following for the defaults:
+- =xhci_pci=
+- =qat_420xx=
+
+
+For the fallback versions, I got the following:
+- =xhci_pci=
+- =aic94xx=
+- =bfa=
+- =qed=
+- =qla1280=
+- =qla2xxx=
+- =wd719x=
+- =qat_420xx=
+
+
+Most of the time, this does not matter. Several of these modules are
+for ancient hardware that is (mostly) irrelevant. Realistically, it
+will never matter *unless* you find are going out of your way to play
+with old hardware, etc.
+
+This is especially true for the *fallback* version.
+
+I would like to solve the warnings for the two that are thrown for the *non-fallback* images:
+- for =xhci_pci=, there's an [[https://aur.archlinux.org/packages/upd72020x-fw][AUR package that can be installed]]
+- for =qat_420xx=... there's no [[https://intel.github.io/quickassist/RN/In-Tree/in_tree_firmware_RN.html#qat-firmware-available][current release for linux]].
+  - you will see that =qat_420xx.bin= and =qat_420xx_mmp.bin= are
+    listed as =Pending= under version and release date.
+  - previous iterations, e.g. =qat_4xxx=, have been merged into
+    =linux-firmware= so there's a good chance this will be resolved
+    over time.
+
+
+for all the others generated by the fallback images, there are [[https://wiki.archlinux.org/title/Mkinitcpio#Possibly_missing_firmware_for_module_XXXX][existing packages to solve this]].
+* liveUSB recovery commands
+remember how I ssh into my machine? this is also useful for getting a
+rescue environment up and going quickly if something goes wrong.
+** boot the liveusb
+ssh into the machine for ease of copy-pasting commands:
+- =iwctl=
+  - station list
+  - station wlan0 connect SmallsShadowRealm-5
+  - quit
+- =passwd=
+- =ip addr show= for ip addr
+
+once ssh'd in:
+
+** luks
+
+decrypt luks partition
+
+#+begin_src sh
+  cryptsetup luksOpen /dev/nvme1n1p2 main
+#+end_src
+
+** mount
+
+mount all relevant btrfs partitions. tbqf, swap and even the var
+volumes are probably not strictly required but it doesn't hurt to
+mount them when the goal is recovery.
+
+#+begin_src sh
+  mount -o subvol=@ /dev/mapper/main /mnt
+  mount -o subvol=@log /dev/mapper/main /mnt/var/log
+  mount -o subvol=@pkg /dev/mapper/main /mnt/var/cache/pacman/pkg
+  mount -o subvol=@tmp /dev/mapper/main /mnt/var/tmp
+  mount -o subvol=5 /dev/mapper/main /mnt/btrfs
+  # idk if swap is actually needed but lol
+  mount -o compress=no,subvol=@swap /dev/mapper/main /mnt/swap
+  swapon /mnt/swap/swapfile
+#+end_src
+
+mount efi
+
+#+begin_src sh
+  mount -o uid=0,gid=0,fmask=0077,dmask=0077 /dev/nvmeon1p1 /mnt/boot
+#+end_src
+
+chroot
+
+#+begin_src sh
+  arch-chroot /mnt
+#+end_src
