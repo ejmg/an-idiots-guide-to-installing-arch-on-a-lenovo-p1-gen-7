@@ -12,7 +12,7 @@ The features of this install include:
 - ZRAM based swap
 
 
-[[file:img/neofetch-desktop.png][my desktop with kitty and neofetch]]
+[[file:img/neofetch-desktop.png]]
 
 
 *consider this guide WIP.*
