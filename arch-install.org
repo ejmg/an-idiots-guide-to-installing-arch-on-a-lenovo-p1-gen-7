@@ -1,5 +1,9 @@
 * arch install dot text
 
+*consider this guide WIP.*
+
+*furthermore, use this guide at your own risk.*
+
 these are my notes, thus far, for installing arch linux, from scratch,
 on a Lenovo P1 Gen 7 w/ an Intel Ultra 9 185H, NVIDIA RTX 4070 Max-Q,
 and 64Gb RAM.
@@ -11,15 +15,8 @@ The features of this install include:
 - BTRFS for volume management + swapfile for proper system hibernation
 - ZRAM based swap
 
-
 [[file:img/neofetch-desktop.png]]
 
-
-*consider this guide WIP.*
-
-*furthermore, use this guide at your own risk.*
-
-** TODO references/resources
 ** summary/review
 
 my system works. it works fast. it work good. it work nice. it just
@@ -32,6 +29,58 @@ NVIDIA. this proved to be the case but, more than anything else, a lot
 of things had changed since i last made a full system install from
 scratch. furthermore, this time round, I am using tools like
 systemd-boot, edk2-shell, and BTRFS. [[https://youtu.be/UW12BT9pYEw?feature=shared][the game done changed]].
+
+** status of guide
+
+this guide is basically 95% complete in terms of the following objectives:
+- what did i need to do to get windows to play nicely with installing arch on the second SSD
+  - this includes not just releasing the second drive from bitlocker/windows but also dual booting
+  - the only caveat is dual booting without disabling bitlocker on the
+    first SSD, on which there is a note in the post-install section
+- what did i need to do to actually install arch itself on that ssd/this laptop
+  - this includes setting up LUKS, BTRFS, and ZRAM
+- what did i need to do to get a basic DE up and running
+  - this includes loading into the system, decrypting it, and
+    successfully logging into my desktop environment where Everything
+    Just Works.
+  - this also includes NVIDIA playing nicely
+
+
+of these things, only the first section on windows that is sparse in
+documentation. I did all of that before I started writing this file
+and I only had to do it once... and I haven't gone back to document it
+more fully. Sorry I haven't done that yet. FWIW, the outline of
+headers is like 1/2 of the documentation because it really wasn't that
+hard.
+
+** references/resources
+besides the arch wiki itself, one of the best resources in existence
+for learning about linux etc, here are the guides that influenced my
+own by way of showing me different approaches to (mostly) the same
+subset of features and issues that this guide tackles.
+- @Th3Whit3Wolf's [[https://gist.github.com/Th3Whit3Wolf/0150bd13f4b2667437c55b71bfb073e4][arch_sec_install.sh gist]]
+  - this guide uses =refind= instead of =systemd-boot=
+- Arch wiki user ZachHilman's [[https://wiki.archlinux.org/title/User:ZachHilman/Installation_-_Btrfs_%2B_LUKS2_%2B_Secure_Boot][personal guide]]
+  - this guide builds a UKI with secure boot enabled
+- @orhun's [[https://gist.github.com/orhun/02102b3af3acfdaf9a5a2164bea7c3d6][notes on his arch linux install]]
+  - this guide uses ZFS instead of BTRFS and has secure boot with TPM enabled
+  - I use a BTRFS managed swapfile, he uses a physical partition.
+- The Rad Lectures YT video tutorial, [[https://www.youtube.com/watch?v=Qgg5oNDylG8][Arch Linux Install Guide (including BTRFS, QTile, ZRAM, disk encryption, timeshift)]]
+  - He uses QTile, I'm not. I also use a swapfile in addition to ZRAM.
+
+As you can see, I noted key feature differences in these guides in
+case you might be more interested in pursuing alternative install
+features. If you do that, you should probably use that specific guide
+instead of mine. I do have a strong interest in checking out UKIs and
+secure-boot (a TODO further below) but I am content, for the time
+being, with running with the install I have now. In theory, UKI should
+be pretty trivial to change to (I nearly had it working previously and
+suspect I know the error now) and my only hesistance with enabling
+secure boot is the fact it can, in theory, brick your system. Many
+users have no issue with this, new Lenovo laptops included, but I
+am... holding out... for now... on the hopes someone else with a gen 7
+P1 will take the leap first and confirm success re: enabling secure
+boot with self-signed keys.
 
 ** preface note on installing with SSD upgrade
 I bought a customized model.
@@ -51,18 +100,18 @@ seperated and that, absent re-install shenanigans, Windows should
 never mangle my linux drive and vice-versa.
 
 *Even if you are not doing that*, the following is good information to
-know as it impacts how I documented my own install.
+know.
 
 *** drive labels
 
 Before changing my drives, the "primary" SSD (where Windows is
 installed) was reported as =nvme0n1=. I wrote this guide while testing
-my install on the original "secondary" SSD. At the time, it was
-labeled =nvme1n1=.
+my install on the original "secondary" SSD. At the time, that second
+drive was labeled =nvme1n1=.
 
 After nailing out a ~fully functional and fleshed out base install of
-Arch, I swapped the drives. When I first booted the system, *the
-labels of my drives swapped*. However, when I rebooted the system
+Arch, I upgraded the second drive. When I first booted the system,
+*the labels of my drives swapped*. However, when I rebooted the system
 again... they were back to their original names. They haven't changed
 since.
 
@@ -77,22 +126,27 @@ across machines and installs.
 The only other note I have is which physical drive slot is which. That
 is to say—when the laptop is flipped over and opened up—of the two
 physical SSD slots, the leftside slot is the drive that contains the
-base windows install. The second slot, the one I am upgrading and
-installed Arch Linux, is the slot on the righthand side of the
-laptop. The process was extremely easy given the new design of lenovo
-laptops but here's a personal note that might help others who are
-doing the same scheme as me.
+base windows install. The second slot, the one I installed arch linux
+on and eventually upgraded, is the slot on the righthand side of the
+laptop. For those wondering, the process was extremely easy given the
+new design of lenovo laptops. Maybe this note might help someone save
+the 5 minutes it would take to check & re-swap SSDs.
 
-TODO: attach the photos I took. Why not. 
+TODO: attach the photos of swapping SSDs.
 
 ** Windows & UEFI/bios
 *** find EFI partition for windows
-Go to disk management and confirm the partition setup.
+Go to disk management and confirm the partition setup. In particular,
+if you plan on dual booting, now is a good time to learn where
+Windows' EFI partition is.
 
 For me:
-- =Disk 0, Partition 1=, this will be =nvme0n1p1=
-  + =260mb= size
+- =Disk 0= is the partition that Windows itself is installed on
+  + =Partition 1=, i.e. =nvme0n1p1=, is the EFI partition for Windows
+  + it is =260mb= size
 - you can also note the =2gb= recovery partition at the *end* of the drive
+- the other drive is the second SSD and is currently entirely unused. this is where I am installing arch.
+  + this is =nvme1n1= on my system
 *** copy bitlocker backup codes
 So my drives came encrypted with Bitlocker by
 default... but... because I didn't pay for Windows 11 Pro... I don't
@@ -836,7 +890,7 @@ functional fallback initramfs for that given version of linux.
   title Arch Linux Fallback
   linux /vmlinuz-linux
   initrd /initramfs-linux-fallback.img
-  options rd.luks.name=UUID=NAME_OF_LUKS_VOLUME root=/dev/mapper/NAME_OF_LUKS_VOLUME rootflags=subvol=@ resume=/dev/mapper/NAME_OF_LUKS_VOLUME_WITH_SWAPFILE resume_offset=BTRFS_OFFSET nvidia-drm.modeset=1 NVreg_PreserveVideoMemoryAllocations=1 nvidia.NVreg_TemporaryFilePath=/var/tmp sysrq_always_enabled=1 nowatchdog quiet splash rw
+  options rd.luks.name=UUID=NAME_OF_LUKS_VOLUME root=/dev/mapper/NAME_OF_LUKS_VOLUME rootflags=subvol=@ resume=/dev/mapper/NAME_OF_LUKS_VOLUME_WITH_SWAPFILE resume_offset=BTRFS_OFFSET nvidia-drm.modeset=1 NVreg_PreserveVideoMemoryAllocations=1 nvidia.NVreg_TemporaryFilePath=/var/tmp sysrq_always_enabled=1 nowatchdog splash quiet loglevel=3 systemd.show_status=auto rd.udev.log_level=3 vt.global_cursor_default=0 rw
 #+end_src
 
 note how line #2 is identical to the original. it's only =/initramfs-linux-fallback.img= that is different.
@@ -1351,6 +1405,24 @@ aside: instead of using a =windows.nsh= file, you can just inline the
 path in the following conf file. Just replace =windows.nsh= 1:1 with the full path enumerated above.
 
 reboot and you should see windows in the boot menu! You should test it out. If it doesn't work, it may be related to the same issue I had above when using aliases *other than* the =FSX= variant.
+
+** check screensharing on wayland
+wayland is now the default on the majority of mainline linux
+distros. a lot of work has been put into back-compatibilities for xorg
+functionality that remains unsupported for whatever reason, be it the
+available API or the literal architectural differences between xorg
+and wayland.
+
+that all said, if you are using KDE as I installed it
+above... screensharing, at least via tools like chromium and discord,
+ought to work.
+
+to test chromium, you can go to this [[https://mozilla.github.io/webrtc-landing/gum_test.html][website]]. simply choose a screen,
+an application, or a desktop and see if this page correctly mirrors
+the selected target. if it doesn't work, something is definitely wrong
+and you should start hitting up the arch wiki. =xdg-desktop-portal=
+makes this possible for =gtk=, =kde=, and other backends, so that may
+be a good place to start looking.
 
 ** TODO secure sudo
 *** root logins
