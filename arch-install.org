@@ -67,6 +67,7 @@ subset of features and issues that this guide tackles.
   - I use a BTRFS managed swapfile, he uses a physical partition.
 - The Rad Lectures YT video tutorial, [[https://www.youtube.com/watch?v=Qgg5oNDylG8][Arch Linux Install Guide (including BTRFS, QTile, ZRAM, disk encryption, timeshift)]]
   - He uses QTile, I'm not. I also use a swapfile in addition to ZRAM.
+- mpr's YT video, [[https://www.youtube.com/watch?v=maIu1d2lAiI][Snapper Rollback on Arch Linux]]
 
 As you can see, I noted key feature differences in these guides in
 case you might be more interested in pursuing alternative install
@@ -703,11 +704,12 @@ Note, I am *installing kernel modules for NVIDIA and intel's microcode*
 you shouldn't be installing these lol.
 
 #+begin_src sh
-  pacman -S linux-headers linux-lts linux-lts-headers os-prober dkms intel-ucode nvidia-open-dkms \
-	 nvidia-utils nvidia-settings opencl-nvidia efivar edk2-shell efibootmgr sudo git pigz lbzip2 \
-	 networkmanager iwd plymouth openssh zsh zsh-completions dosfstools gptfdisk btrfs-progs \
-	 terminus-font ttf-dejavu ttf-liberation noto-fonts ttf-fira-code cantarell-fonts  adobe-source-sans-fonts \
-	 adobe-source-han-sans-otc-fonts adobe-source-han-serif-otc-fonts noto-fonts noto-fonts-emoji libfido2 firefox chromium
+    pacman -S linux-headers linux-lts linux-lts-headers os-prober dkms intel-ucode nvidia-open-dkms \
+	   nvidia-utils nvidia-settings opencl-nvidia efivar edk2-shell efibootmgr sudo git pigz lbzip2 \
+	   networkmanager iwd plymouth openssh zsh zsh-completions dosfstools gptfdisk btrfs-progs man-pages man-db \
+	   terminus-font ttf-dejavu ttf-liberation noto-fonts ttf-fira-code cantarell-fonts  adobe-source-sans-fonts \
+	   adobe-source-han-sans-otc-fonts adobe-source-han-serif-otc-fonts noto-fonts noto-fonts-emoji libfido2  \
+	   firefox chromium duf 
 #+end_src
 
 *** create user
@@ -1070,7 +1072,8 @@ will want from the get-go. I will definitely be installing more as I
 go along and realize I am missing something lol.
 
 #+begin_src sh
-  sudo pacman -S plasma konsole dolphin ark kwrite spectacle krunner partitionmanager gwenview okular kcharselect
+    sudo pacman -S plasma konsole dolphin ark kwrite spectacle krunner partitionmanager kdeconnect gwenview okular kcharselect \
+	 qt6-tools nuspell hunspell hunspell-en_us hunspell-es_mx libreoffice-fresh libmythes mythes-en hyphen hyphen-en
 #+end_src
 
 you're going to be given a lot of options. i went with defaults (don't
@@ -1229,6 +1232,77 @@ and moving it to a different monitor made it visible/render
 correctly. The behavior did not replicate the few times I re-opened it
 afterwards, thankfully.
 
+** js
+install nvm
+#+begin_src sh
+  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+  source ~/.zshrc
+  nvm install node && nvm use node
+#+end_src
+*** install pnpm
+since we now have node installed, it's pretty easy:
+#+begin_src sh
+  corepack enable pnpm && pnpm setup && source ~/.zshrc
+#+end_src
+*** install ts
+#+begin_src sh
+  pnpm install typescript --global
+#+end_src
+*** install turbo
+#+begin_src sh
+  pnpm install turbo --global
+#+end_src
+** pyenv
+first install the required deps for python-build:
+#+begin_src sh
+  # All of these should be installed, sans tk
+  paru -S openssl zlib xz tk
+#+end_src
+
+and then install pyenv itself:
+
+#+begin_src sh
+  curl https://pyenv.run | bash  
+#+end_src
+
+you're going to get some snippets to configure zsh for pyenv, go ahead and add them:
+#+begin_src sh
+  echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.zshrc                                                                                             0>--<20:47[367]
+  echo '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.zshrc
+  echo 'eval "$(pyenv init -)"' >> ~/.zshrc
+  source ~/.zshrc
+#+end_src
+
+this should automatically install =pyenv-virtualenv= by default, go ahead and theck this real quick:
+
+#+begin_src sh
+  pyenv virtualenv --help
+#+end_src
+
+if you get help text, then =pyenv-virtualenv= is installed. if not, run the following:
+#+begin_src sh
+  git clone https://github.com/pyenv/pyenv-virtualenv.git $(pyenv root)/plugins/pyenv-virtualenv
+  echo 'eval "$(pyenv virtualenv-init -)"' >> ~/.zshrc
+  exec "$SHELL"
+#+end_src
+
+finally, add a pyenv managed version of python. a good reason to do
+this is so you always have a version of python that is separate from
+the system python managed by arch. you could always do this yourself
+by managing =venvs= but pyenv makes this whole workflow a lot easier,
+both for things you might want installed at a "global" level and by
+project, etc.
+
+#+begin_src sh
+  # this will take a minute or two
+  pyenv install 3.12.6
+  # or just name it 'g', like i do
+  pyenv virtualenv 3.12.6 global
+  # make it default
+  pyenv global g
+  # check your defaul
+  pyenv global # or pyenv version
+#+end_src
 ** ssh
 *** import ssh
 so i want to re-use a private key. first:
@@ -1270,6 +1344,12 @@ i like to use github to test my ssh:
 #+end_src
 
 you should get a congratulations message if everything is setup correctly.
+
+** rust
+just use the install script:
+#+begin_src sh
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+#+end_src
 
 ** additional plymouth themes
 
@@ -1436,6 +1516,166 @@ and you should start hitting up the arch wiki. =xdg-desktop-portal=
 makes this possible for =gtk=, =kde=, and other backends, so that may
 be a good place to start looking.
 
+** more system audio
+*** controlling cli audio with bluetooth headphones
+in my case, this is necessary for controlling =ncspot= (see next
+section) with my bluetooth headphones. this is not the only thing it
+is useful for but it's pretty damn convenient just for =ncspot=.
+
+simply install =playerctl=
+#+begin_src sh
+  paru -S playerctl
+#+end_src
+
+and then configure and enable the daemon as a systemd unit:
+#+begin_src sh
+  mg -n ~/.config/systemd/user/playerctld.service
+#+end_src
+
+with the following: 
+#+begin_src conf
+  [Unit]
+  Description=Keep track of media player activity
+
+  [Service]
+  Type=oneshot
+  ExecStart=/usr/bin/playerctld daemon
+
+  [Install]
+  WantedBy=default.target
+#+end_src
+
+#+begin_src sh
+  systemctl daemon-reload
+  systemctl --user enable playerctld.service
+#+end_src
+
+*** ncspot
+the simplest and imo most functional spotify client with a tiny memory
+footprint.
+
+there is currently an upstream bug that makes the AUR bin
+non-functional but a fix has been deployed on main so let's install
+that somewhere. note that the =covers= feature was causing a new,
+possibly related, bug that made =ncspot= unuseable so we don't build
+it with that feature.
+
+#+begin_src sh
+    mkdir sftw && cd sftw
+    git clone git@github.com:hrkfdn/ncspot.git && cd ncspot
+    # mpris, notify, share_clipboard, and pulseaudio_backend (this works with pipewire)
+    # are included in default. 
+    cargo build --release
+#+end_src
+
+i like to keep locally built binaries (non-AUR, etc) in my own =~/bin/= directory:
+#+begin_src sh
+  mkdir ~/bin && cp target/release/ncspot ~/bin
+#+end_src
+
+running =ncspot= will prompt you to follow an OATH link to connect
+your account. after doing that, you should be able to use
+=ncspot=. note, it might take a few seconds to populate the client as
+it syncs your accounts state locally (playlists, recently favorited
+songs, etc).
+
+**** configuration
+
+there's a lot to configure. [[https://github.com/hrkfdn/ncspot/blob/main/doc/users.md#configuration][check it out here]].
+
+**** TODO notifications
+
+TODO: they don't seem to be spawning and should be enabled by
+default. might just be an issue between what KDE is expecting and what
+ncspot emits. not the biggest deal. 
+
+**** kitty terminal 
+
+with =kitty= terminal, ncspot used to struggle with some
+ascii/coloring. *this doesn't appear to be the case anymore* but if
+the problem returns, there's a trivial solution:
+
+#+begin_src sh
+  TERM=xterm-256color ncspot
+#+end_src
+
+simply create an alias in your =.zshrc= if this becomes something you
+need.
+
+*** EasyEffects (equalizer)
+convenient audio equalizer with GUI built on GTK. Easy to use and with plenty of community contribs, so that's just what I went with.
+
+this installs easyeffects + other deps that, on my machine, weren't
+already pulled in by the other audio related packages I've installed
+while working through this guide.
+#+begin_src sh
+  paru -S easyeffects lsp-plugins calf zam-plugins mda.lv2
+#+end_src
+
+furthermore, you would benefit from pulling in some profiles made by
+the community. these are two big ones with decent presets that are
+ready to use. download each repo's zip file, unzip it, and then copy
+the json configs under =.config/easyeffects/output=:
+- https://github.com/JackHack96/EasyEffects-Presets
+- https://github.com/p-chan5/EasyPulse?tab=readme-ov-file
+
+**** further audio nerd stuff to check out later
+- https://github.com/jaakkopasanen/AutoEq
+*** noise suppression
+EasyEffects also handles microphone noise suppression. I haven't had
+to test this yet given discord rolls its own solution and that's the
+only mic-related activity i've engaged in thus-far.
+
+To do this, we'll use [[https://gist.github.com/jtrv/47542c8be6345951802eebcf9dc7da31][this profile]]. This profile was developed to
+target masculine, ie lower pitched, voices. Based on my reading of the
+config file (both the original and the current version), to make the
+profile friender to higher pitched voices, modify the following lines
+to a higher frequency:
+#+begin_src js
+  // This file is supposed to be JSON so these comments will be invalid if used in your config.
+  {
+    "input": {
+      // Skipping lines...
+      "equalizer#0": {
+	// skipping...
+	"left": {
+	  "band0": {
+	    "frequency": 50.0 // this is the line. increase this by e.g. 10-30 and see if it helps.
+	    // SNIP
+	  },
+	  "band1": {
+	    "frequency": 90.0 // same thing here. increase it by the same bump you did above.
+	  },
+	  // SNIP
+	},
+	// SNIP
+	"right": {
+	    // exact same thing as above for both band0 and band1 again.
+	},
+      },
+    },
+  }
+#+end_src
+
+while i doubt that these modifications are sufficient for a higher
+pitched, more feminine voice, I think it will help by raising the core
+frequency baseline used for monitoring human voice input. what is
+really cool about this config is that it is AI generated so I have no
+real way to introspect the logic that emitted it. /what a time to be alive/
+
+**** alternatives to easyeffects for noise suppression
+there are two popular/common solutions, one is packaged by arch
+directly and the other is via aur. Including EasyEffects, each use
+RNNs, Recurrent Neural Networks for audio noise reduction.
+1. https://archlinux.org/packages/?name=noise-suppression-for-voice
+   - this is the arch packaged solution
+   - config: https://github.com/werman/noise-suppression-for-voice#pipewire
+   - considered slightly more complex to configure but, by that measure, allows more user customization
+2. https://aur.archlinux.org/packages/noisetorch
+   - this is considered a lot more easy/user friendly in terms of defaults
+   - also includes a threshold mechanism that auto-mute microphone
+     when no speech is detected
+     
 ** TODO secure sudo
 *** root logins
 ** TODO finger print for sudo/login 
@@ -1469,13 +1709,34 @@ first, open =/etc/pam.d/sudo= and add the following line to the top of the file:
 
 *** sudo with fingerprint would be pretty cool
 ** TODO btrfs optimizations
+*** TODO snapshots (snapper)
+- https://wiki.archlinux.org/title/Snapper
+- https://wiki.archlinux.org/title/Btrfs
+- https://github.com/jrabinow/snapper-rollback
+- https://gitlab.com/btrfs-assistant/btrfs-assistant
+- https://www.youtube.com/watch?v=maIu1d2lAiI
+- https://www.youtube.com/watch?v=G_RNR9WTbnQ
+
+whole point of btrfs is to have a more robust file system that allows
+us to restore previous state. we should install tools that make that
+easy.
+
+#+begin_src sh
+  paru -S snapper btrfs-assistant snapper-rollback snap-pac
+#+end_src
+
+let's make configs for root and home.
+
+since we already made subvols for these, we need to umount...
 *** TODO additional subvolumes for the caches of user installed/managed applications
 - =~/.cache/= or, at least, specific subdirectories
+- apparently should create volumes for both firefox and chromium
+- subvols for gnupg and ssh
+- subvols for sddm/gdm
 *** TODO maintenance
 - https://github.com/kdave/btrfsmaintenance
 *** TODO deduping
 - https://github.com/Zygo/bees
-*** TODO snapshots (snapper)
 ** TODO dotfiles
 ** TODO more NVIDIA?
 *** enable =nvidia_drm.fbdev=1=?
