@@ -1322,6 +1322,20 @@ Aside: this has small implications for editors and software that make
 strong use of keybindings such as Emacs/VIM. FWIW, I have yet to hit a
 situation where there wasn't an easy and good solution for when this
 happens.
+
+** notes on KDE
+*** restart plasmashell
+say something gets funky with plasmashell, like your taskbar, how do
+you reload the plasma desktop environment? simply restart the systemd user service:
+#+begin_src sh
+  systemctl --user restart plasma-plasmashell.service 
+#+end_src
+
+here's a more "manual" way of doing it if, for whatever reason, the systemd unit is not being used:
+#+begin_src sh
+  kquitapp6 plasmashell; kstart plasmashell
+#+end_src
+
 ** IDEs
 *** emacs
 a lot of people don't know this, but GTK/QT apps can have less latency
@@ -1479,6 +1493,8 @@ just use the install script:
 #+begin_src sh
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 #+end_src
+
+if it tells you to copy anything to your =.zshrc= you should do that.
 
 ** additional plymouth themes
 
@@ -1729,6 +1745,12 @@ RNNs, Recurrent Neural Networks for audio noise reduction.
    - also includes a threshold mechanism that auto-mute microphone
      when no speech is detected
      
+*** support libs
+turns out these are useful for running some videogames and other media
+related software that expects 32 bit support:
+#+begin_src sh
+  paru -S lib32-libpulse lib32-libpipewire
+#+end_src
 ** font tweaking
 *** emojis still not rendering correctly on some applications/websites (?)
 based on the way fontconfig works (this is cursed and eldritch
