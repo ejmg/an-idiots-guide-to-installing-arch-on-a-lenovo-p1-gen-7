@@ -417,7 +417,7 @@ Using =lsblk=, let's assume that the USB appears as =sdb= with a single =sdb1= p
   mkfs.btrfs -L main /dev/mapper/main
 #+end_src
 
-**** efi (/boo)
+**** efi (=/boot=)
 
 #+begin_src sh
   # ...but, for mkfs.fat, -n is used to give a name (label) to the partition...
@@ -1290,6 +1290,38 @@ path in the following conf file. Just replace =windows.nsh= 1:1 with the full pa
 
 reboot and you should see windows in the boot menu! You should test it out. If it doesn't work, it may be related to the same issue I had above when using aliases *other than* the =FSX= variant.
 
+** compose key
+[[https://en.wikipedia.org/wiki/Compose_key][The Compose Key]] is a pattern used for enabling character input on
+keyboards that otherwise lack keys/support for things like diacritics,
+special symbols used in alternative/non-ASCII alphabets, and so on.
+
+Linux has long supported this by way of X11/Xorg and, to my knowledge,
+this is how it is still handled, even in wayland environments. [[https://wiki.archlinux.org/title/Xorg/Keyboard_configuration#Configuring_compose_key][Here's
+the Arch Wiki subsection on it]] along with where the default input
+codes are sourced and how to modify them, etc.
+
+For now, we'll just use [[https://userbase.kde.org/Tutorials/ComposeKey][KDE's approach to handling this]].
+
+Go under keyboard settings via the searchbar. =Super=, ie the
+Windows Key, should trigger this.
+
+You should see three tabs: Hardware, Layouts, and Key Bindings.
+
+For basic compose key functionality, go straight to Key Bindings and
+enable "Configure keyboard options".
+
+In the long list of options immediately below that, find "Position of
+Compose Key" and expand its options. Here, you can choose how the
+compose key works. For me, the rightside Alt key is good enough for me
+since I'm working with a "70%" keyboard. You can obviously make your
+system a bit more nuanced by using a second or layer to help trigger
+the compose key which, IIRC, is what I did last time. I might do that
+later. It's really your call to make.
+
+Aside: this has small implications for editors and software that make
+strong use of keybindings such as Emacs/VIM. FWIW, I have yet to hit a
+situation where there wasn't an easy and good solution for when this
+happens.
 ** IDEs
 *** emacs
 a lot of people don't know this, but GTK/QT apps can have less latency
