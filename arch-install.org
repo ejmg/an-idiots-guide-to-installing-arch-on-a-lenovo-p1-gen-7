@@ -1960,6 +1960,166 @@ and ran by Plasma when the DE is initialized. [[https://userbase.kde.org/Session
 Add it to your =.zshrc= if you find yourself launching GUI applications
 from the CLI directly and you noticed weird font compression.
 
+** hardware acceleration
+install:
+#+begin_src sh
+  paru -S libva-utils
+#+end_src
+
+should be able to check with:
+#+begin_src sh
+  vainfo
+#+end_src
+
+if you get no error, you are good to go
+** wayland and x11
+*** preface on the state of Wayland vs X11 with respect to my personal workflow
+
+So far, default with Wayland has been *mostly* fine. In several
+regards, it is clearly better than my last experience with x11.
+
+My plan is to run Wayland until it creates friction that actively
+hampers my usage. In that case, I'll probably hard switch to X11. This
+won't be a painless act; in such a scenario, userland software will fall into one of three buckets:
+1. software automatically run in either environment
+   - this is the ideal "no intervention" scenario but it still requires me to be cognizant of program performance differences etc
+   - some programs don't do this but still provide wrapper
+     executables/desktop shortcuts that launch the program with the
+     correct configuration for the given environment. this is still
+     better than nothing because it helps makes this explicit.
+2. software that has to be manually re-installed/configured to run in X11 mode
+   - an easy example is my current version of Emacs which was compiled to run on wayland.
+3. software that is exclusively wayland or x11
+   - I can't immediately think of a program I am *currently* using
+     that fits this category but an obvious example is =hyprland=.
+   - Something that is more likely than not, however, is that I am
+     using a program that has since *dropped* X11 support and now
+     prioritizes Wayland.
+     - best case scenario is that X11 support is in maintenance mode
+       but I wouldn't be shocked if there are userland programs that
+       have actively abandoned Wayland.
+
+
+*** detecting whether an application is running using =Xwayland= or using native =Wayland=, etc
+
+**** When using KDE's kwin
+
+#+begin_src sh
+  qdbus6 org.kde.KWin /KWin org.kde.KWin.showDebugConsole
+#+end_src
+
+**** generally
+
+install =xorg-xeyes=
+
+#+begin_src sh
+  paru -S xorg-xeyes
+#+end_src
+
+run =xeyes= from a terminal. an ominous pair of eyes should render in
+the middle of your desktop (i am not joking). these eyes will only
+follow your mouse cursor when they are hovering over an x11
+application. as an example, if you move your cursor over the eyes
+themselves, they will follow because the eyes are an x11
+application. they will stop following, however, so long as you are
+hovering over non-x11 applications. the default for chromium, as of
+this install, is to run with =Xwayland= (more on this below). so when
+i move my cursor over chromium, the eyes are suddenly following my
+cursor again.
+
+i know this section sounds insane and that's because it is, in fact,
+insane. all of this is insane. why do we let ourselves suffer like
+this. why are you here reading this document. why am i writing it?
+
+anyway, TLDR: when the eyes are moving, that means you are hoving over
+an x11 server of some kind, i.e. Xwayland when under Wayland.
+
+
+*** current noticeable issues
+
+here's a list I'll keep of programs where I am noticing issues that
+previously did not exist. I want to be very clear that this is not a
+criticism of these applications. furthermore, I also want to be clear
+that these problems may be a complication of *my NVIDIA graphics card*
+than Wayland in-of-itself. Some people might see this as one and the
+same but NVIDIA drivers have been a *notorious* issue since I first
+started using Linux and that was........... a while ago.
+
+anyway, here comes the list.
+
+**** chromium (solved lol)
+
+1. graphical artifacts and other related rendering problems
+
+This one was surprising, to be frank. As of now, chromium seems to
+have minor graphical artifacts. Sometimes there will be large
+geometric patches that simply don't render correctly or contain
+artifacts from the previous state of a webpage or of that piece of the
+desktop before/after chromium rendered.
+
+Some light research indicates that I'm probably experiencing a known
+regression that is related to a feature flag that is supposed to
+auto-detect/handle the compositor.
+
+Attempting a previous solution of running with a different flag for
+wayland made the problem worse, not better.
+
+Ensuring that =intel-media-driver= and =vulkan-intel= were installed,
+however, seems to have greatly improved launch time + rendering
+afaict. There are still errors, however, and running natively on
+wayland is entirely unworkable right now.
+
+my theory, as of now, is that my NVIDIA configuration is not playing
+nicely with Wayland in someway, form such that it makes Chromium very
+upset when I attempt to run chromium with wayland directly (as opposed
+to xwayland).
+
+Possible leads:
+- https://bbs.archlinux.org/viewtopic.php?pid=2188033#p2188033
+- https://bbs.archlinux.org/viewtopic.php?id=298254
+
+***** solution
+
+add =i915= to the =MODULES= list in your =mkinitcpio.conf= file. i'm
+serious. i genuinely don't know why this works. the comments from the
+linked issues seem to indicate this isn't actually solving the issue
+but... I am now able to run chromium with wayland directly and can confirm that:
+- it boots up very fast. like /really/ fast. it wasn't doing this when
+  i was trying to use wayland the first time.
+- it renders correctly. no artifacts. no weird fonting anti-aliasing. nothing.
+- it is extremely snappy.
+
+
+so, in summary, the top of my =mkinitcpio.conf= now looks like:
+#+begin_src conf
+  # vim:set ft=sh
+  # MODULES
+  # The following modules are loaded before any boot hooks are
+  # run.  Advanced users may wish to specify all system modules
+  # in this array.  For instance:
+  #     MODULES=(usbhid xhci_hcd)
+  MODULES=(i915 nvidia nvidia_modeset nvidia_uvm nvidia_drm btrfs)
+#+end_src
+
+rebuild your mkinitcpio and restart your system. you are free to try
+these changes without modifying chromium's flag directly via:
+#+begin_src sh
+  /usr/bin/chromium \
+  --enable-features=UseOzonePlatform \
+  --ozone-platform=wayland
+#+end_src
+
+you will see some errors about =Buffer handle is Null= in your
+terminal but this is a result of launching it from the CLI
+directly. the arch wiki for chromium has a fix for this if that's how
+you're using chromium in general.
+
+to make this change permanent, you can either write a flag to
+=~/.conf/chromium-flags.conf= or... just change the setting under
+=about://flags=. set =Preferred Ozone platform= to =auto=. exit out of
+chromium (don't relaunch it via the button it provides) and check
+things with i.e. =xeyes=.
+
 ** TODO secure sudo
 *** root logins
 ** TODO finger print for sudo/login 
