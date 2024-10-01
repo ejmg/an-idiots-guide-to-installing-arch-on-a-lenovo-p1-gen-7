@@ -2120,6 +2120,80 @@ to make this change permanent, you can either write a flag to
 chromium (don't relaunch it via the button it provides) and check
 things with i.e. =xeyes=.
 
+** run firefox & chromium in tmpfs
+it is possible to run your user profile for firefox, chromium, etc in
+=tmpfs=. this will give a serious boost to the speed of these
+applications in addition to reducing the wear and tear on your ssd.
+
+install
+#+begin_src sh
+  paru -S profile-sync-daemon
+#+end_src
+
+and then use visudo to allow overlayfs mode (or don't, but I am):
+#+begin_src sh
+  EDITOR=nano visudo
+#+end_src
+
+simply add this at the bottom of the file:
+#+begin_src conf
+  YOUR_USERNAME_HERE ALL=(ALL) NOPASSWD: /usr/bin/psd-overlay-helper
+#+end_src
+
+now run =psd= by itself and without starting the service because it'll
+create its config file for us to tweak.
+
+open it at:
+#+begin_src sh
+  mg -n ~/.config/psd/psd.conf
+#+end_src
+
+and change the following to yes:
+#+begin_src conf
+  # SNIP
+  USE_OVERLAYFS="yes"
+  # SNIP
+  USE_SUSPSYNC="yes"
+  # SNIP
+  # keep empty if you want all supported browsers to use tmpfs
+  BROWSERS=(firefox chromium)
+  # SNIP
+  # I just don't think I need so many backups
+  BACKUP_LIMIT=3
+#+end_src
+
+I also want my profiles to sync more frequently than an hour, so I'm
+making the following service file extension:
+
+#+begin_src sh
+  mg -n ~/.config/systemd/user/psd-resync.timer.d/frequency.conf
+#+end_src
+
+with the following:
+#+begin_src conf
+  [Unit]
+  Description=Timer for Profile-sync-daemon - 15min
+
+  [Timer]
+  OnUnitActiveSec=
+  OnUnitActiveSec=10min
+#+end_src
+
+this syncs every 15 minutes. Make it whatever you want, etc.
+
+finally, check that your config is good:
+#+begin_src sh
+  psd parse
+#+end_src
+
+it should show that everything is good except for the services
+themselves. *before doing that, close your browsers* or else it will
+fail to start!
+
+now start them:
+#+begin_src sh
+  systemctl --user start psd.service 
+#+end_src
 ** TODO secure sudo
 *** root logins
 ** TODO finger print for sudo/login 
