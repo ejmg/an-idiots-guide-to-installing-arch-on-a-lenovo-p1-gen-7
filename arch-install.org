@@ -699,18 +699,24 @@ TODO: emphasize that downstream configs are made on the assumption
 these packages have been installed. Several sections will simply not
 work without them.
 
-Note, I am *installing kernel modules for NVIDIA and intel's microcode*
-(=intel-ucode=). If you don't have NVIDIA or intel on your machine,
-you shouldn't be installing these lol.
+Note, I am *installing kernel modules for NVIDIA and intel's
+microcode* (=intel-ucode=, =vulkan-intel=, =intel-media-driver=). If
+you don't have NVIDIA or intel on your machine, you shouldn't be
+installing these lol.
 
 #+begin_src sh
-    pacman -S linux-headers linux-lts linux-lts-headers os-prober dkms intel-ucode nvidia-open-dkms \
-	   nvidia-utils nvidia-settings opencl-nvidia efivar edk2-shell efibootmgr sudo git pigz lbzip2 \
-	   networkmanager iwd plymouth openssh zsh zsh-completions dosfstools gptfdisk btrfs-progs man-pages man-db \
-	   terminus-font ttf-dejavu ttf-liberation noto-fonts ttf-fira-code cantarell-fonts  adobe-source-sans-fonts \
-	   adobe-source-han-sans-otc-fonts adobe-source-han-serif-otc-fonts noto-fonts noto-fonts-emoji libfido2  \
-	   firefox chromium duf 
+  pacman -S linux-headers linux-lts linux-lts-headers os-prober dkms intel-ucode intel-media-driver vulkan-intel libva-utils vdpauinfo \
+	 nvidia-open-dkms nvidia-utils nvidia-settings opencl-nvidia efivar edk2-shell efibootmgr sudo git pigz \
+	 lbzip2 networkmanager iwd plymouth openssh zsh zsh-completions dosfstools gptfdisk btrfs-progs man-pages \
+	 man-db terminus-font ttf-dejavu ttf-liberation noto-fonts ttf-fira-code cantarell-fonts adobe-source-sans-fonts \
+	 adobe-source-han-sans-otc-fonts adobe-source-han-serif-otc-fonts noto-fonts noto-fonts-emoji libfido2  \
+	 firefox chromium duf xwaylandvideobridge
 #+end_src
+
+there are a lot of fonts in here but this will provide you with a
+system that should be able to render a large chunk of east/south Asian
+character sets in addition to providing emojis, monospace fonts, and a
+good selection of san-serif fonts.
 
 *** create user
 
@@ -1676,6 +1682,215 @@ RNNs, Recurrent Neural Networks for audio noise reduction.
    - also includes a threshold mechanism that auto-mute microphone
      when no speech is detected
      
+** font tweaking
+*** emojis still not rendering correctly on some applications/websites (?)
+based on the way fontconfig works (this is cursed and eldritch
+knowledge), it looks like we still need to explicitly demand for =Noto
+Color Emoji= to be rendered across font families and when
+e.g. websites request a specific type of emoji font that are not
+available on our system (i.e. Apple Emoji, etc).
+
+create the following:
+#+begin_src sh
+  mg -n /usr/share/fontconfig/conf.avail/75-noto-color-emoji.conf
+#+end_src
+
+with the following:
+#+begin_src xml
+  <?xml version="1.0" encoding="UTF-8"?>
+  <!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+  <fontconfig>
+
+      <!-- Add generic family. -->
+      <match target="pattern">
+	  <test qual="any" name="family"><string>emoji</string></test>
+	  <edit name="family" mode="assign" binding="same"><string>Noto Color Emoji</string></edit>
+      </match>
+
+      <!-- This adds Noto Color Emoji as a final fallback font for the default font families. -->
+      <match target="pattern">
+	  <test name="family"><string>sans</string></test>
+	  <edit name="family" mode="append"><string>Noto Color Emoji</string></edit>
+      </match>
+
+      <match target="pattern">
+	  <test name="family"><string>serif</string></test>
+	  <edit name="family" mode="append"><string>Noto Color Emoji</string></edit>
+      </match>
+
+      <match target="pattern">
+	  <test name="family"><string>sans-serif</string></test>
+	  <edit name="family" mode="append"><string>Noto Color Emoji</string></edit>
+      </match>
+
+      <match target="pattern">
+	  <test name="family"><string>monospace</string></test>
+	  <edit name="family" mode="append"><string>Noto Color Emoji</string></edit>
+      </match>
+
+      <!-- Block Symbola from the list of fallback fonts. -->
+      <selectfont>
+	  <rejectfont>
+	      <pattern>
+		  <patelt name="family">
+		      <string>Symbola</string>
+		  </patelt>
+	      </pattern>
+	  </rejectfont>
+      </selectfont>
+
+      <!-- Use Noto Color Emoji when other popular fonts are being specifically requested. -->
+      <match target="pattern">
+	  <test qual="any" name="family"><string>Apple Color Emoji</string></test>
+	  <edit name="family" mode="assign" binding="same"><string>Noto Color Emoji</string></edit>
+      </match>
+
+      <match target="pattern">
+	  <test qual="any" name="family"><string>Segoe UI Emoji</string></test>
+	  <edit name="family" mode="assign" binding="same"><string>Noto Color Emoji</string></edit>
+      </match>
+
+      <match target="pattern">
+	  <test qual="any" name="family"><string>Segoe UI Symbol</string></test>
+	  <edit name="family" mode="assign" binding="same"><string>Noto Color Emoji</string></edit>
+      </match>
+
+      <match target="pattern">
+	  <test qual="any" name="family"><string>Android Emoji</string></test>
+	  <edit name="family" mode="assign" binding="same"><string>Noto Color Emoji</string></edit>
+      </match>
+
+      <match target="pattern">
+	  <test qual="any" name="family"><string>Twitter Color Emoji</string></test>
+	  <edit name="family" mode="assign" binding="same"><string>Noto Color Emoji</string></edit>
+      </match>
+
+      <match target="pattern">
+	  <test qual="any" name="family"><string>Twemoji</string></test>
+	  <edit name="family" mode="assign" binding="same"><string>Noto Color Emoji</string></edit>
+      </match>
+
+      <match target="pattern">
+	  <test qual="any" name="family"><string>Twemoji Mozilla</string></test>
+	  <edit name="family" mode="assign" binding="same"><string>Noto Color Emoji</string></edit>
+      </match>
+
+      <match target="pattern">
+	  <test qual="any" name="family"><string>TwemojiMozilla</string></test>
+	  <edit name="family" mode="assign" binding="same"><string>Noto Color Emoji</string></edit>
+      </match>
+
+      <match target="pattern">
+	  <test qual="any" name="family"><string>EmojiTwo</string></test>
+	  <edit name="family" mode="assign" binding="same"><string>Noto Color Emoji</string></edit>
+      </match>
+
+      <match target="pattern">
+	  <test qual="any" name="family"><string>Emoji Two</string></test>
+	  <edit name="family" mode="assign" binding="same"><string>Noto Color Emoji</string></edit>
+      </match>
+
+      <match target="pattern">
+	  <test qual="any" name="family"><string>EmojiSymbols</string></test>
+	  <edit name="family" mode="assign" binding="same"><string>Noto Color Emoji</string></edit>
+      </match>
+
+      <match target="pattern">
+	  <test qual="any" name="family"><string>Symbola</string></test>
+	  <edit name="family" mode="assign" binding="same"><string>Noto Color Emoji</string></edit>
+      </match>
+
+  </fontconfig>
+#+end_src
+
+then symbolically link it:
+
+#+begin_src sh
+    sudo ln -s /usr/share/fontconfig/conf.avail/75-noto-color-emoji.conf /etc/fonts/conf.d
+#+end_src
+
+finally, create the following =local.conf=:
+#+begin_src sh
+  sudo mg -n /etc/fonts/local.conf
+#+end_src
+
+#+begin_src xml
+  <?xml version="1.0"?>
+  <!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+  <fontconfig>
+   <alias>
+     <family>sans-serif</family>
+     <prefer>
+       <family>Noto Sans</family>
+       <family>Noto Color Emoji</family>
+     </prefer> 
+   </alias>
+
+   <alias>
+     <family>serif</family>
+     <prefer>
+       <family>Noto Serif</family>
+       <family>Noto Color Emoji</family>
+     </prefer>
+   </alias>
+
+   <alias>
+    <family>monospace</family>
+    <prefer>
+      <family>Fira Code</family>
+      <family>Noto Color Emoji</family>
+     </prefer>
+   </alias>
+  </fontconfig>
+#+end_src
+
+run =fc-cache -f=. restarting your session (logout & login) probably
+wouldn't hurt, either, but I don't know the full nuances of how fonts
+are cached and loaded by the desktop environment.
+
+*if fonts break, this is the first thing that should be removed.*
+
+*** certain emojis not rendering
+
+i came to notice this with the transgender/trans flag.
+
+KDE apps and some other things (chromium, oddly enough?) will not
+render the e.g. trans flag correctly. Inputting it (via text fields,
+etc) will show it rendering correctly, however. it appears this is
+related, at minimum, years old bug with QT and its font
+modernization. womp womp.
+
+- https://bugs.archlinux.org/task/74736
+- https://www.mail-archive.com/kde-bugs-dist@kde.org/msg608563.html
+- https://bugreports.qt.io/browse/QTBUG-111801
+
+*** fix =fractional_scaling=
+In my short amount of time using KDE Plasma 6, there has been one
+noticeable degradation from my prior usage. Fonts look /off/. It turns
+out there's a small bug betweet QT and Plasma that causes fonts
+rendered in some (QT) applications to look squished, particularly on
+HDPi monitors with scaling.
+
+This is the recommended mitigation for now. In theory, this should be
+fixed very soon in Plasma/KDE as QT [[https://bugs.kde.org/show_bug.cgi?id=479891#c48][has already shipped a fix in =qt6 6.8=]].
+
+Create and open the following file:
+#+begin_src sh
+  mkdir -p ~/.config/plasma-workspace/env/
+  mg -n ~/.config/plasma-workspace/env/path.sh
+#+end_src
+
+and add the following:
+#+begin_src sh
+  export QT_SCALE_FACTOR_ROUNDING_POLICY=RoundPreferFloor
+#+end_src
+
+This directory is special and any scripts inside of it are picked up
+and ran by Plasma when the DE is initialized. [[https://userbase.kde.org/Session_Environment_Variables][Documentation]].
+
+Add it to your =.zshrc= if you find yourself launching GUI applications
+from the CLI directly and you noticed weird font compression.
+
 ** TODO secure sudo
 *** root logins
 ** TODO finger print for sudo/login 
