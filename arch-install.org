@@ -1134,8 +1134,22 @@ etc).
 if that doesn't fix things... time to start reading the arch wiki 😎.
 
 * Post-install configurations
-You should get ZRAM and an AUR helper setup at the minimum. It will be
-quick if you just follow what I documented below.
+If you have followed this far, congrats and apologies. You should have
+a working KDE Desktop Environment that you can login into. What you do
+hereout is mostly up to you. That said: *you should get ZRAM and an
+AUR helper setup at the minimum.*
+
+You already have a BTRFS swap partition setup for hibernation but no
+actual Swap. ZRAM is a fast swap solution that is kept entirely in
+memory and will help when your system is under high demand for memory.
+
+An AUR helper is a non-critical but extremely useful tool. AUR is a
+reason why a lot of people use arch in the first place.
+
+
+Getting these two things up and going will be quick if you follow what
+I document below in the two immediate subsections. Throw everything
+else out the window for all I care.
 ** setup zram
 *** config
 
@@ -1200,6 +1214,82 @@ once you have paru on your system, you can delete the directory we just made.
 
 you can use paru to handle everything else from here.
 
+** dual boot windows using systemd-boot via edk2-shell
+*** a preface
+when I first did this, I had no issues with bitlocker and launching from the Arch managed bootloader.
+
+however, upon re-install on my new SSD, bitlocker did nothing but give
+me issues. As a result, I was forced between choosing an encrypted
+windows partition and using a single bootloader to launch. For now, I
+have decrypted the windows partition for the sake of ease-of-use but I
+plan on trying to re-encrypt it later and see if that fixes the
+problem (decrypting & then re-encrypting). I doubt it will, but I'll try lol.
+
+*** configuring with edk2
+
+- tutorial: https://forum.endeavouros.com/t/tutorial-add-a-systemd-boot-loader-menu-entry-for-a-windows-installation-using-a-separate-esp-partition/37431
+  
+cp edk2-shell into =/boot/=, systemd-boot will automatically detect it and add it to the boot options.
+#+begin_src sh
+  cp /usr/share/edk2-shell/x64/Shell.efi /boot/shellx64.efi
+#+end_src
+recall the windows partition with window's EFI, nvme0n1p1
+
+check blkid for the PARTUUID of that partition:
+#+begin_src sh
+  blkid
+  # something like this
+  /dev/nvme0n1p1: LABEL="SYSTEM" UUID="7C1C-4DAE" BLOCK_SIZE="512" TYPE="vfat" PARTLABEL="EFI system partition" PARTUUID="e0549dce-0997-4db7-ba2f-d3f1df67ade7"
+#+end_src
+
+mine was =0549dce-0997-[SNIP]-d3f1df67ade7=.
+
+restart machine. choose the UEFI shell option. it should automatically
+list the device mappings. look for the device alias that has the same
+PARTUUID.
+
+mine was =FS1:HD1b;BLK7=. You can theoretically go with any of these
+three, =FS1=, =HD1b=, and =BLK7=, but IME the latter two are liable to
+change (and thus break the boot entry) whereas =FS1= hasn't changed
+across the several times I've had to play with this.
+
+run =exit= and reboot into liveusb/arch and create the following file:
+
+#+begin_src sh
+  nano /boot/loader/entries/windows.nsh
+#+end_src
+
+with the full EFI path:
+#+begin_src conf
+  <ALIAS>:EFI\Microsoft\Boot\Bootmgfw.efi
+#+end_src
+
+where =<ALIAS>= is the alias of your specific windows EFI (=FSX=,
+=HDXY=, =BLKX=). As previously mentioned, I chose to go with =FS1=:
+#+begin_src conf
+  FS1:EFI\Microsoft\Boot\Bootmgfw.efi	  
+#+end_src
+
+now just make the boot entry for windows at =/boot/entries/windows.conf=:
+#+begin_src conf
+  title Windows
+  efi   /shellx64.efi
+  options -nointerrupt -exit windows.nsh
+#+end_src
+
+some additional options:
+#+begin_src sh
+  # optional, hides default UEFI shell greeting
+  -nomap -noversion
+  # hide addition unnecessary output from UEFI
+  -noconsoleout
+#+end_src
+
+aside: instead of using a =windows.nsh= file, you can just inline the
+path in the following conf file. Just replace =windows.nsh= 1:1 with the full path enumerated above.
+
+reboot and you should see windows in the boot menu! You should test it out. If it doesn't work, it may be related to the same issue I had above when using aliases *other than* the =FSX= variant.
+
 ** IDEs
 *** emacs
 a lot of people don't know this, but GTK/QT apps can have less latency
@@ -1239,6 +1329,7 @@ correctly. The behavior did not replicate the few times I re-opened it
 afterwards, thankfully.
 
 ** js
+*** nvm
 install nvm
 #+begin_src sh
   curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
@@ -1258,7 +1349,7 @@ since we now have node installed, it's pretty easy:
 #+begin_src sh
   pnpm install turbo --global
 #+end_src
-** pyenv
+** python (pyenv & pyenv-virtualenv)
 first install the required deps for python-build:
 #+begin_src sh
   # All of these should be installed, sans tk
@@ -1427,82 +1518,6 @@ with the following:
   ExecStartPost=-/usr/bin/sleep 30
   ExecStartPost=-/usr/bin/plymouth quit --retain-splash
 #+end_src
-
-** dual boot windows using systemd-boot via edk2-shell
-*** a preface
-when I first did this, I had no issues with bitlocker and launching from the Arch managed bootloader.
-
-however, upon re-install on my new SSD, bitlocker did nothing but give
-me issues. As a result, I was forced between choosing an encrypted
-windows partition and using a single bootloader to launch. For now, I
-have decrypted the windows partition for the sake of ease-of-use but I
-plan on trying to re-encrypt it later and see if that fixes the
-problem (decrypting & then re-encrypting). I doubt it will, but I'll try lol.
-
-*** configuring with edk2
-
-- tutorial: https://forum.endeavouros.com/t/tutorial-add-a-systemd-boot-loader-menu-entry-for-a-windows-installation-using-a-separate-esp-partition/37431
-  
-cp edk2-shell into =/boot/=, systemd-boot will automatically detect it and add it to the boot options.
-#+begin_src sh
-  cp /usr/share/edk2-shell/x64/Shell.efi /boot/shellx64.efi
-#+end_src
-recall the windows partition with window's EFI, nvme0n1p1
-
-check blkid for the PARTUUID of that partition:
-#+begin_src sh
-  blkid
-  # something like this
-  /dev/nvme0n1p1: LABEL="SYSTEM" UUID="7C1C-4DAE" BLOCK_SIZE="512" TYPE="vfat" PARTLABEL="EFI system partition" PARTUUID="e0549dce-0997-4db7-ba2f-d3f1df67ade7"
-#+end_src
-
-mine was =0549dce-0997-[SNIP]-d3f1df67ade7=.
-
-restart machine. choose the UEFI shell option. it should automatically
-list the device mappings. look for the device alias that has the same
-PARTUUID.
-
-mine was =FS1:HD1b;BLK7=. You can theoretically go with any of these
-three, =FS1=, =HD1b=, and =BLK7=, but IME the latter two are liable to
-change (and thus break the boot entry) whereas =FS1= hasn't changed
-across the several times I've had to play with this.
-
-run =exit= and reboot into liveusb/arch and create the following file:
-
-#+begin_src sh
-  nano /boot/loader/entries/windows.nsh
-#+end_src
-
-with the full EFI path:
-#+begin_src conf
-  <ALIAS>:EFI\Microsoft\Boot\Bootmgfw.efi
-#+end_src
-
-where =<ALIAS>= is the alias of your specific windows EFI (=FSX=,
-=HDXY=, =BLKX=). As previously mentioned, I chose to go with =FS1=:
-#+begin_src conf
-  FS1:EFI\Microsoft\Boot\Bootmgfw.efi	  
-#+end_src
-
-now just make the boot entry for windows at =/boot/entries/windows.conf=:
-#+begin_src conf
-  title Windows
-  efi   /shellx64.efi
-  options -nointerrupt -exit windows.nsh
-#+end_src
-
-some additional options:
-#+begin_src sh
-  # optional, hides default UEFI shell greeting
-  -nomap -noversion
-  # hide addition unnecessary output from UEFI
-  -noconsoleout
-#+end_src
-
-aside: instead of using a =windows.nsh= file, you can just inline the
-path in the following conf file. Just replace =windows.nsh= 1:1 with the full path enumerated above.
-
-reboot and you should see windows in the boot menu! You should test it out. If it doesn't work, it may be related to the same issue I had above when using aliases *other than* the =FSX= variant.
 
 ** check screensharing on wayland
 wayland is now the default on the majority of mainline linux
